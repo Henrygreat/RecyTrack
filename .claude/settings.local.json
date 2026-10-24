@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npx prisma validate:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(set \"DATABASE_URL=postgresql://test:test@localhost:5432/test\")",
+      "Bash(set \"AUTH_SECRET=test-secret-for-build\")",
+      "Bash(npm run build:*)",
+      "Bash(docker --version:*)",
+      "Bash(docker build:*)",
+      "Bash(dir:*)"
+    ]
+  }
+}
