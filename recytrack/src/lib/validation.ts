@@ -1,0 +1,4 @@
+import { z } from "zod";
+export const customerSchema = z.object({name:z.string().trim().min(2).max(160),contactName:z.string().trim().max(120).optional(),email:z.union([z.email(),z.literal("")]).optional(),phone:z.string().max(40).optional(),address:z.string().max(240).optional(),postcode:z.string().max(16).optional()});
+export const collectionSchema = z.object({customerId:z.string().min(1),address:z.string().trim().min(5).max(240),postcode:z.string().trim().min(3).max(16),itemEstimate:z.coerce.number().int().min(0).max(100000),notes:z.string().max(2000).optional(),routeDateId:z.string().optional(),requestedDate:z.string().optional()}).refine(v=>Boolean(v.routeDateId)||Boolean(v.requestedDate),{message:"Choose a scheduled route or request an alternative date"});
+export const statusSchema=z.enum(["REQUESTED","CONFIRMED","ASSIGNED","IN_TRANSIT","COLLECTED","RECEIVED","CANCELLED"]);

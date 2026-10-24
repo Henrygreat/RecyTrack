@@ -1,0 +1,130 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql" url = env("DATABASE_URL") }
+
+enum Role { OWNER ADMIN OPERATIONS DRIVER WAREHOUSE CUSTOMER }
+enum CollectionStatus { REQUESTED CONFIRMED ASSIGNED IN_TRANSIT COLLECTED RECEIVED CANCELLED }
+enum BookingMode { SCHEDULED ALTERNATIVE }
+enum AssetStatus { EXPECTED COLLECTED RECEIVED INSPECTION DATA_ERASURE REUSE RECYCLE RELEASED }
+model User {
+  id String @id @default(cuid())
+  name String?
+  email String @unique
+  passwordHash String
+  createdAt DateTime @default(now())
+  memberships Membership[]
+}
+model Organization {
+  id String @id @default(cuid())
+  name String
+  slug String @unique
+  createdAt DateTime @default(now())
+  memberships Membership[]
+  customers Customer[]
+  zones CollectionZone[]
+  routeDates RouteDate[]
+  collections Collection[]
+  assets Asset[]
+  auditLogs AuditLog[]
+}
+model Membership {
+  id String @id @default(cuid())
+  userId String
+  organizationId String
+  role Role
+  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Cascade)
+  @@unique([userId,organizationId])
+  @@index([organizationId,role])
+}
+model Customer {
+  id String @id @default(cuid())
+  organizationId String
+  name String
+  contactName String?
+  email String?
+  phone String?
+  address String?
+  postcode String?
+  createdAt DateTime @default(now())
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Cascade)
+  collections Collection[]
+  @@unique([id,organizationId])
+  @@index([organizationId,name])
+}
+model CollectionZone {
+  id String @id @default(cuid())
+  organizationId String
+  name String
+  postcodePrefixes String[]
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Cascade)
+  routeDates RouteDate[]
+  @@unique([id,organizationId])
+}
+model RouteDate {
+  id String @id @default(cuid())
+  organizationId String
+  zoneId String
+  serviceDate DateTime @db.Date
+  capacity Int
+  isOpen Boolean @default(true)
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Cascade)
+  zone CollectionZone @relation(fields:[zoneId,organizationId],references:[id,organizationId])
+  collections Collection[]
+  @@unique([zoneId,serviceDate])
+  @@unique([id,organizationId])
+  @@index([organizationId,serviceDate])
+}
+model Collection {
+  id String @id @default(cuid())
+  organizationId String
+  reference String
+  customerId String
+  routeDateId String?
+  bookingMode BookingMode @default(ALTERNATIVE)
+  requestedDate DateTime? @db.Date
+  status CollectionStatus @default(REQUESTED)
+  address String
+  postcode String
+  itemEstimate Int @default(0)
+  notes String?
+  driverName String?
+  collectedAt DateTime?
+  receivedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Cascade)
+  customer Customer @relation(fields:[customerId,organizationId],references:[id,organizationId])
+  routeDate RouteDate? @relation(fields:[routeDateId,organizationId],references:[id,organizationId])
+  assets Asset[]
+  @@unique([organizationId,reference])
+  @@unique([id,organizationId])
+  @@index([organizationId,status,createdAt])
+}
+model Asset {
+  id String @id @default(cuid())
+  organizationId String
+  collectionId String
+  assetTag String
+  category String
+  manufacturer String?
+  model String?
+  serialNumber String?
+  status AssetStatus @default(EXPECTED)
+  createdAt DateTime @default(now())
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Cascade)
+  collection Collection @relation(fields:[collectionId,organizationId],references:[id,organizationId])
+  @@unique([organizationId,assetTag])
+  @@index([organizationId,serialNumber])
+}
+model AuditLog {
+  id String @id @default(cuid())
+  organizationId String
+  actorUserId String?
+  action String
+  entityType String
+  entityId String
+  details Json?
+  createdAt DateTime @default(now())
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Cascade)
+  @@index([organizationId,createdAt])
+}
