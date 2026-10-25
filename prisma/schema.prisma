@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// ENUMS
+// ============================================
+
 enum Role {
   OWNER
   ADMIN
@@ -14,6 +18,21 @@ enum Role {
   DRIVER
   WAREHOUSE
   CUSTOMER
+}
+
+enum CustomerRole {
+  CUSTOMER_ADMIN
+  CUSTOMER_USER
+}
+
+enum CustomerType {
+  BUSINESS
+  INDIVIDUAL
+}
+
+enum CustomerStatus {
+  ACTIVE
+  ARCHIVED
 }
 
 enum CollectionStatus {
@@ -42,6 +61,10 @@ enum AssetStatus {
   RELEASED
 }
 
+// ============================================
+// CORE USER & ORGANIZATION MODELS
+// ============================================
+
 model User {
   id           String       @id @default(cuid())
   name         String?
@@ -49,6 +72,8 @@ model User {
   passwordHash String
   createdAt    DateTime     @default(now())
   memberships  Membership[]
+  customerAccess CustomerAccess[]
+  invitationsSent CustomerInvitation[] @relation("InvitedBy")
 }
 
 model Organization {
@@ -58,11 +83,14 @@ model Organization {
   createdAt   DateTime         @default(now())
   memberships Membership[]
   customers   Customer[]
+  sites       Site[]
+  contacts    CustomerContact[]
   zones       CollectionZone[]
   routeDates  RouteDate[]
   collections Collection[]
   assets      Asset[]
   auditLogs   AuditLog[]
+  customerInvitations CustomerInvitation[]
 }
 
 model Membership {
@@ -77,22 +105,165 @@ model Membership {
   @@index([organizationId, role])
 }
 
-model Customer {
-  id             String       @id @default(cuid())
-  organizationId String
-  name           String
-  contactName    String?
-  email          String?
-  phone          String?
-  address        String?
-  postcode       String?
-  createdAt      DateTime     @default(now())
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  collections    Collection[]
+// ============================================
+// CUSTOMER MANAGEMENT (Phase 2)
+// ============================================
 
+model Customer {
+  id             String         @id @default(cuid())
+  organizationId String
+  reference      String         // Unique customer code e.g. CUST-0001
+  name           String
+  customerType   CustomerType   @default(BUSINESS)
+  companyNumber  String?        // UK Company House number
+  vatNumber      String?        // VAT registration
+  email          String?        // Main email
+  phone          String?
+  website        String?
+  address        String?        // Billing address
+  postcode       String?
+  status         CustomerStatus @default(ACTIVE)
+  notes          String?        // Internal notes
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  // Legacy field - kept for migration compatibility
+  contactName    String?
+
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sites          Site[]
+  contacts       CustomerContact[]
+  collections    Collection[]
+  customerAccess CustomerAccess[]
+  invitations    CustomerInvitation[]
+
+  @@unique([organizationId, reference])
   @@unique([id, organizationId])
   @@index([organizationId, name])
+  @@index([organizationId, status])
 }
+
+model Site {
+  id                    String          @id @default(cuid())
+  organizationId        String
+  customerId            String
+  reference             String          // Unique site code e.g. SITE-0001
+  name                  String
+  address               String
+  postcode              String
+  contactName           String?
+  contactPhone          String?
+  contactEmail          String?
+  collectionInstructions String?
+  vehicleAccessNotes    String?
+  openingHours          String?
+  isActive              Boolean         @default(true)
+  isDefault             Boolean         @default(false)
+  zoneId                String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer              Customer        @relation(fields: [customerId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  zone                  CollectionZone? @relation(fields: [zoneId, organizationId], references: [id, organizationId])
+  contacts              CustomerContact[]
+  siteAccess            SiteAccess[]
+
+  @@unique([organizationId, reference])
+  @@unique([id, organizationId])
+  @@index([customerId])
+  @@index([organizationId, isActive])
+}
+
+model CustomerContact {
+  id             String       @id @default(cuid())
+  organizationId String
+  customerId     String
+  siteId         String?      // Optional - can be customer-level or site-specific
+  name           String
+  email          String?
+  phone          String?
+  jobTitle       String?
+  isPrimary      Boolean      @default(false)
+  isBilling      Boolean      @default(false)
+  isOperational  Boolean      @default(false)
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer       Customer     @relation(fields: [customerId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  site           Site?        @relation(fields: [siteId, organizationId], references: [id, organizationId])
+
+  @@unique([id, organizationId])
+  @@index([customerId])
+  @@index([siteId])
+  @@index([organizationId, isPrimary])
+}
+
+// ============================================
+// CUSTOMER USER ACCESS (Phase 2)
+// ============================================
+
+model CustomerAccess {
+  id             String        @id @default(cuid())
+  userId         String
+  customerId     String
+  organizationId String
+  role           CustomerRole  @default(CUSTOMER_USER)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customer       Customer      @relation(fields: [customerId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  siteAccess     SiteAccess[]
+
+  @@unique([userId, customerId])
+  @@index([customerId])
+  @@index([organizationId])
+}
+
+model SiteAccess {
+  id               String         @id @default(cuid())
+  customerAccessId String
+  siteId           String
+  organizationId   String
+  createdAt        DateTime       @default(now())
+
+  customerAccess   CustomerAccess @relation(fields: [customerAccessId], references: [id], onDelete: Cascade)
+  site             Site           @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@unique([customerAccessId, siteId])
+  @@index([siteId])
+}
+
+model CustomerInvitation {
+  id             String        @id @default(cuid())
+  organizationId String
+  customerId     String
+  siteId         String?       // Optional site-specific access
+  email          String
+  role           CustomerRole  @default(CUSTOMER_USER)
+  token          String        @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  invitedByUserId String
+  createdAt      DateTime      @default(now())
+
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer       Customer      @relation(fields: [customerId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  invitedBy      User          @relation("InvitedBy", fields: [invitedByUserId], references: [id])
+
+  @@index([token])
+  @@index([customerId])
+  @@index([email])
+  @@index([organizationId, expiresAt])
+}
+
+// ============================================
+// COLLECTION & LOGISTICS MODELS
+// ============================================
 
 model CollectionZone {
   id               String       @id @default(cuid())
@@ -101,6 +272,7 @@ model CollectionZone {
   postcodePrefixes String[]
   organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   routeDates       RouteDate[]
+  sites            Site[]
 
   @@unique([id, organizationId])
 }
@@ -179,4 +351,5 @@ model AuditLog {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, createdAt])
+  @@index([entityType, entityId])
 }

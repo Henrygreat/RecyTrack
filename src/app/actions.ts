@@ -9,15 +9,31 @@ import type { CollectionStatus } from "@prisma/client";
 
 function value(form: FormData, key: string) { return String(form.get(key) ?? ""); }
 function parseDate(input:string) { const d=new Date(`${input}T12:00:00.000Z`); if(!/^\d{4}-\d{2}-\d{2}$/.test(input)||Number.isNaN(d.getTime())||d.toISOString().slice(0,10)!==input) throw new Error("Invalid date"); return d; }
+
+async function generateCustomerReference(organizationId: string): Promise<string> {
+  const lastCustomer = await prisma.customer.findFirst({
+    where: { organizationId },
+    orderBy: { reference: "desc" },
+    select: { reference: true },
+  });
+  if (!lastCustomer?.reference) return "CUST-0001";
+  const match = lastCustomer.reference.match(/CUST-(\d+)/);
+  if (!match) return "CUST-0001";
+  const nextNum = parseInt(match[1], 10) + 1;
+  return `CUST-${nextNum.toString().padStart(4, "0")}`;
+}
+
 export async function createCustomer(form:FormData) {
   const { organizationId, userId } = await requireMember(undefined,MANAGEMENT_ROLES);
   const parsed=customerSchema.parse(Object.fromEntries(form));
+  const reference = await generateCustomerReference(organizationId);
   await prisma.$transaction(async tx=>{
-    const c=await tx.customer.create({data:{...parsed,organizationId}});
+    const c=await tx.customer.create({data:{...parsed,reference,organizationId}});
     await tx.auditLog.create({data:{organizationId,actorUserId:userId,action:"CUSTOMER_CREATED",entityType:"Customer",entityId:c.id}});
   });
   revalidatePath("/dashboard/customers"); redirect("/dashboard/customers");
 }
+
 export async function createCollection(form:FormData) {
   const { organizationId,userId } = await requireMember(undefined,MANAGEMENT_ROLES);
   const parsed=collectionSchema.parse(Object.fromEntries(form));
@@ -36,7 +52,9 @@ export async function createCollection(form:FormData) {
   },{isolationLevel:"Serializable"});
   revalidatePath("/dashboard/collections");redirect("/dashboard/collections");
 }
+
 const transitions:Record<CollectionStatus,CollectionStatus[]>={REQUESTED:["CONFIRMED","CANCELLED"],CONFIRMED:["ASSIGNED","CANCELLED"],ASSIGNED:["IN_TRANSIT","CANCELLED"],IN_TRANSIT:["COLLECTED","CANCELLED"],COLLECTED:["RECEIVED"],RECEIVED:[],CANCELLED:[]};
+
 export async function updateCollectionStatus(form:FormData){
   const {organizationId,userId}=await requireMember(undefined,MANAGEMENT_ROLES);
   const id=value(form,"id"),status=statusSchema.parse(value(form,"status"));
