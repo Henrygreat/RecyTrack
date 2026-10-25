@@ -18,7 +18,8 @@
       "Bash(npm --version:*)",
       "Bash(findstr:*)",
       "Bash(npm ls:*)",
-      "Bash(npm explain:*)"
+      "Bash(npm explain:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: resolve Server Action mismatch and CredentialsSignin errors\n\nRoot causes:\n- Login form used inline anonymous server action with unstable action ID\n- Auth.js errors were not caught, causing HTTP 500 on invalid credentials\n- Missing trustHost configuration for reverse proxy deployments\n\nChanges:\n- Extract login action to named export for stable action IDs\n- Add proper error handling that preserves Auth.js redirect exceptions  \n- Display user-friendly error messages for invalid credentials\n- Add trustHost: true for Coolify/reverse proxy compatibility\n- Add JWT/session callbacks to include user ID in session\n- Add error styling to globals.css\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }
