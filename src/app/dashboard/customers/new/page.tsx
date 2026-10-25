@@ -1,2 +1,23 @@
-import {createCustomer} from "@/app/actions";import {requireMember,MANAGEMENT_ROLES} from "@/lib/access";
-export default async function NewCustomer(){await requireMember(undefined,MANAGEMENT_ROLES);return <><h1>Add customer</h1><div className="panel"><form action={createCustomer} className="form">{[["Company name","name",true],["Contact person","contactName",false],["Email","email",false],["Phone","phone",false],["Address","address",false],["Postcode","postcode",false]].map(([label,name,required])=><div className="field" key={String(name)}><label>{label}</label><input name={String(name)} required={Boolean(required)}/></div>)}<button className="btn">Save customer</button></form></div></>}
+import { requireMember, MANAGEMENT_ROLES } from "@/lib/access";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card, CardContent } from "@/components/ui/card";
+import { CustomerForm } from "../components/customer-form";
+
+export default async function NewCustomer() {
+  await requireMember(undefined, MANAGEMENT_ROLES);
+
+  return (
+    <>
+      <PageHeader
+        title="Add Customer"
+        description="Create a new customer account"
+      />
+
+      <Card>
+        <CardContent style={{ padding: "1.5rem" }}>
+          <CustomerForm />
+        </CardContent>
+      </Card>
+    </>
+  );
+}
