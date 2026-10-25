@@ -2,7 +2,9 @@
 FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+COPY .npmrc* ./
+# Use --omit=optional for cross-platform builds (WASM fallbacks are used)
+RUN npm ci --omit=optional
 
 # Stage 2: Build the application
 FROM node:22-alpine AS builder
@@ -12,9 +14,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build-time environment variables required by Prisma and Next.js
-ARG DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
-ENV DATABASE_URL=${DATABASE_URL}
+# Build-time placeholder for Prisma schema validation (not a secret)
+ENV DATABASE_URL="postgresql://build:build@localhost:5432/build"
 
 # Generate Prisma client and build Next.js
 RUN npx prisma generate && npm run build
@@ -53,6 +54,9 @@ EXPOSE 3000
 
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+
+# Runtime secrets (DATABASE_URL, AUTH_SECRET, AUTH_URL) are injected by Coolify
+# DO NOT add secrets as ENV or ARG in this Dockerfile
 
 ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "server.js"]

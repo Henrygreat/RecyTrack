@@ -13,7 +13,12 @@
       "Bash(npx prisma migrate diff:*)",
       "Bash(git add:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: add Prisma migrations and production deployment support\n\n- Pin Prisma CLI and Client to exact version 6.19.3 for compatibility\n- Move Prisma CLI from devDependencies to dependencies for production use\n- Create initial database migration \\(20241025000000_init\\)\n- Update Dockerfile to copy Prisma schema, migrations, and CLI to production\n- Add docker-entrypoint.sh to run migrations before app startup\n- Make seed script safe to rerun without overwriting existing passwords\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(set \"AUTH_SECRET=test-secret\")"
+      "Bash(set \"AUTH_SECRET=test-secret\")",
+      "Bash(node --version:*)",
+      "Bash(npm --version:*)",
+      "Bash(findstr:*)",
+      "Bash(npm ls:*)",
+      "Bash(npm explain:*)"
     ]
   }
 }
