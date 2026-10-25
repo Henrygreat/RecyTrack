@@ -5,8 +5,6 @@ import {
   Mail,
   MapPin,
   Building,
-  Search,
-  Filter,
   Archive,
   CheckCircle,
   Phone,
@@ -16,6 +14,8 @@ import { requireMember } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { MetricCard } from "@/components/ui/metric-card";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CustomerFilters } from "./components/customer-filters";
 
@@ -100,57 +100,40 @@ export default async function Customers({ searchParams }: PageProps) {
         title="Customers"
         description="Manage your customer database"
         actions={
-          <Link href="/dashboard/customers/new" className="btn">
-            <Plus className="w-4 h-4" style={{ display: "inline", marginRight: "0.5rem" }} />
+          <Link
+            href="/dashboard/customers/new"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-lg hover:bg-teal-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" />
             Add Customer
           </Link>
         }
       />
 
       {/* Stats */}
-      <div className="cards" style={{ marginBottom: "1.5rem" }}>
-        <div className="metric-card">
-          <div className="metric-header">
-            <span className="metric-title">Active Customers</span>
-            <CheckCircle className="w-5 h-5 text-teal-600" />
-          </div>
-          <div className="metric-value">{activeCount}</div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-header">
-            <span className="metric-title">Archived</span>
-            <Archive className="w-5 h-5 text-slate-400" />
-          </div>
-          <div className="metric-value">{archivedCount}</div>
-        </div>
-        <div className="metric-card">
-          <div className="metric-header">
-            <span className="metric-title">Total Records</span>
-            <Users className="w-5 h-5 text-teal-600" />
-          </div>
-          <div className="metric-value">{activeCount + archivedCount}</div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <MetricCard title="Active Customers" value={activeCount} icon={CheckCircle} />
+        <MetricCard title="Archived" value={archivedCount} icon={Archive} />
+        <MetricCard title="Total Records" value={activeCount + archivedCount} icon={Users} />
       </div>
 
       {/* Filters */}
-      <CustomerFilters
-        search={search}
-        status={status}
-        type={type}
-      />
+      <CustomerFilters search={search} status={status} type={type} />
 
       <Card>
-        <CardHeader>
-          <CardTitle>
-            {status === "all"
-              ? "All Customers"
-              : status === "ARCHIVED"
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle>
+              {status === "all"
+                ? "All Customers"
+                : status === "ARCHIVED"
                 ? "Archived Customers"
                 : "Active Customers"}
-            {" "}({totalCount})
-          </CardTitle>
+            </CardTitle>
+            <Badge variant="secondary">{totalCount} records</Badge>
+          </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           {customers.length === 0 ? (
             <EmptyState
               icon={Users}
@@ -164,89 +147,75 @@ export default async function Customers({ searchParams }: PageProps) {
             />
           ) : (
             <>
-              <div style={{ overflowX: "auto" }}>
-                <table className="table">
+              <div className="overflow-x-auto -mx-6">
+                <table className="w-full">
                   <thead>
-                    <tr>
-                      <th style={{ width: "80px" }}>Ref</th>
-                      <th>
+                    <tr className="border-b border-slate-100">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-20">
+                        Ref
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                         <div className="flex items-center gap-2">
-                          <Building className="w-4 h-4 text-slate-400" />
+                          <Building className="w-4 h-4" />
                           Customer
                         </div>
                       </th>
-                      <th>Type</th>
-                      <th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                         <div className="flex items-center gap-2">
-                          <Mail className="w-4 h-4 text-slate-400" />
+                          <Mail className="w-4 h-4" />
                           Contact
                         </div>
                       </th>
-                      <th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                         <div className="flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-slate-400" />
+                          <MapPin className="w-4 h-4" />
                           Location
                         </div>
                       </th>
-                      <th>Sites</th>
-                      <th>Collections</th>
-                      <th style={{ width: "50px" }}></th>
+                      <th className="px-6 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        Sites
+                      </th>
+                      <th className="px-6 py-3 text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                        Collections
+                      </th>
+                      <th className="px-6 py-3 w-12"></th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-100">
                     {customers.map((customer) => (
                       <tr
                         key={customer.id}
-                        style={{ opacity: customer.status === "ARCHIVED" ? 0.6 : 1 }}
+                        className={`hover:bg-slate-50 transition-colors ${
+                          customer.status === "ARCHIVED" ? "opacity-60" : ""
+                        }`}
                       >
-                        <td>
-                          <span
-                            className="font-mono text-xs"
-                            style={{
-                              backgroundColor: "#f1f5f9",
-                              padding: "0.125rem 0.375rem",
-                              borderRadius: "0.25rem",
-                            }}
-                          >
+                        <td className="px-6 py-4">
+                          <span className="font-mono text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded">
                             {customer.reference}
                           </span>
                         </td>
-                        <td>
-                          <div>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
                             <span className="font-medium text-slate-900">{customer.name}</span>
                             {customer.status === "ARCHIVED" && (
-                              <span
-                                className="badge"
-                                style={{
-                                  marginLeft: "0.5rem",
-                                  backgroundColor: "#fef2f2",
-                                  color: "#b91c1c",
-                                  fontSize: "0.65rem",
-                                }}
-                              >
-                                Archived
-                              </span>
+                              <Badge variant="error">Archived</Badge>
                             )}
                           </div>
                         </td>
-                        <td>
-                          <span
-                            className="badge"
-                            style={{
-                              backgroundColor:
-                                customer.customerType === "BUSINESS" ? "#dbeafe" : "#fef3c7",
-                              color: customer.customerType === "BUSINESS" ? "#1e40af" : "#b45309",
-                            }}
-                          >
+                        <td className="px-6 py-4">
+                          <Badge variant={customer.customerType === "BUSINESS" ? "info" : "warning"}>
                             {customer.customerType === "BUSINESS" ? "Business" : "Individual"}
-                          </span>
+                          </Badge>
                         </td>
-                        <td>
+                        <td className="px-6 py-4">
                           <div className="text-sm">
                             {customer.email ? (
                               <a
                                 href={`mailto:${customer.email}`}
-                                className="text-teal-600 hover:text-teal-700"
+                                className="text-teal-600 hover:text-teal-700 hover:underline"
                               >
                                 {customer.email}
                               </a>
@@ -254,26 +223,32 @@ export default async function Customers({ searchParams }: PageProps) {
                               <span className="text-slate-400">—</span>
                             )}
                             {customer.phone && (
-                              <div className="text-slate-500 text-xs flex items-center gap-1">
+                              <div className="text-slate-500 text-xs flex items-center gap-1 mt-0.5">
                                 <Phone className="w-3 h-3" />
                                 {customer.phone}
                               </div>
                             )}
                           </div>
                         </td>
-                        <td className="text-slate-600">{customer.postcode || "—"}</td>
-                        <td>
-                          <span className="tag">{customer._count.sites}</span>
+                        <td className="px-6 py-4 text-slate-600 text-sm">
+                          {customer.postcode || "—"}
                         </td>
-                        <td>
-                          <span className="tag">{customer._count.collections}</span>
+                        <td className="px-6 py-4 text-center">
+                          <span className="inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-700 rounded-full">
+                            {customer._count.sites}
+                          </span>
                         </td>
-                        <td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="inline-flex items-center justify-center min-w-[2rem] px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-700 rounded-full">
+                            {customer._count.collections}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
                           <Link
                             href={`/dashboard/customers/${customer.id}`}
-                            className="text-teal-600 hover:text-teal-700"
+                            className="p-2 rounded-lg hover:bg-slate-100 transition-colors inline-flex"
                           >
-                            <ChevronRight className="w-5 h-5" />
+                            <ChevronRight className="w-5 h-5 text-slate-400" />
                           </Link>
                         </td>
                       </tr>
@@ -284,20 +259,12 @@ export default async function Customers({ searchParams }: PageProps) {
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginTop: "1rem",
-                    paddingTop: "1rem",
-                    borderTop: "1px solid #e2e8f0",
-                  }}
-                >
+                <div className="flex justify-between items-center mt-4 pt-4 border-t border-slate-100 px-6 -mx-6">
                   <span className="text-sm text-slate-600">
-                    Showing {skip + 1} to {Math.min(skip + limit, totalCount)} of {totalCount} customers
+                    Showing {skip + 1} to {Math.min(skip + limit, totalCount)} of {totalCount}{" "}
+                    customers
                   </span>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <div className="flex gap-2">
                     {page > 1 && (
                       <Link
                         href={`/dashboard/customers?${new URLSearchParams({
@@ -306,12 +273,14 @@ export default async function Customers({ searchParams }: PageProps) {
                           ...(type !== "all" && { type }),
                           page: String(page - 1),
                         })}`}
-                        className="btn btn-secondary"
-                        style={{ padding: "0.5rem 1rem" }}
+                        className="px-3 py-1.5 text-sm font-medium bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
                       >
                         Previous
                       </Link>
                     )}
+                    <span className="px-3 py-1.5 text-sm font-medium text-slate-600">
+                      Page {page} of {totalPages}
+                    </span>
                     {page < totalPages && (
                       <Link
                         href={`/dashboard/customers?${new URLSearchParams({
@@ -320,8 +289,7 @@ export default async function Customers({ searchParams }: PageProps) {
                           ...(type !== "all" && { type }),
                           page: String(page + 1),
                         })}`}
-                        className="btn btn-secondary"
-                        style={{ padding: "0.5rem 1rem" }}
+                        className="px-3 py-1.5 text-sm font-medium bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
                       >
                         Next
                       </Link>

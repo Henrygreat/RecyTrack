@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, Filter } from "lucide-react";
+import { Search, Filter, X } from "lucide-react";
 import { useState, useTransition, useCallback } from "react";
 
 interface CustomerFiltersProps {
@@ -43,82 +43,41 @@ export function CustomerFilters({ search, status, type }: CustomerFiltersProps) 
     updateFilters({ search: searchValue });
   };
 
+  const hasActiveFilters = search || status !== "ACTIVE" || type !== "all";
+
   return (
-    <div
-      style={{
-        display: "flex",
-        flexWrap: "wrap",
-        gap: "1rem",
-        marginBottom: "1.5rem",
-        alignItems: "center",
-      }}
-    >
+    <div className="flex flex-wrap gap-3 mb-6 items-center bg-white p-4 rounded-lg border border-slate-200">
       {/* Search */}
-      <form
-        onSubmit={handleSearchSubmit}
-        style={{
-          display: "flex",
-          flex: "1 1 300px",
-          minWidth: "200px",
-        }}
-      >
-        <div
-          style={{
-            position: "relative",
-            display: "flex",
-            flex: 1,
-          }}
-        >
-          <Search
-            className="w-4 h-4"
-            style={{
-              position: "absolute",
-              left: "0.75rem",
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: "#94a3b8",
-            }}
-          />
+      <form onSubmit={handleSearchSubmit} className="flex flex-1 min-w-[200px] max-w-md">
+        <div className="relative flex flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
             placeholder="Search customers..."
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
-            style={{
-              flex: 1,
-              paddingLeft: "2.5rem",
-              paddingRight: "1rem",
-              paddingTop: "0.5rem",
-              paddingBottom: "0.5rem",
-              border: "1px solid #e2e8f0",
-              borderRadius: "0.375rem",
-              fontSize: "0.875rem",
-            }}
+            className="flex-1 pl-10 pr-4 py-2 border border-slate-200 rounded-l-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
           />
         </div>
         <button
           type="submit"
-          className="btn"
-          style={{ marginLeft: "0.5rem" }}
           disabled={isPending}
+          className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-r-lg hover:bg-teal-700 transition-colors disabled:opacity-50"
         >
           Search
         </button>
       </form>
 
+      {/* Divider */}
+      <div className="h-8 w-px bg-slate-200 hidden sm:block" />
+
       {/* Status Filter */}
-      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+      <div className="flex items-center gap-2">
         <Filter className="w-4 h-4 text-slate-400" />
         <select
           value={status}
           onChange={(e) => updateFilters({ status: e.target.value })}
-          style={{
-            padding: "0.5rem 2rem 0.5rem 0.75rem",
-            border: "1px solid #e2e8f0",
-            borderRadius: "0.375rem",
-            fontSize: "0.875rem",
-            backgroundColor: "white",
-          }}
+          className="px-3 py-2 pr-8 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent cursor-pointer"
         >
           <option value="ACTIVE">Active</option>
           <option value="ARCHIVED">Archived</option>
@@ -130,13 +89,7 @@ export function CustomerFilters({ search, status, type }: CustomerFiltersProps) 
       <select
         value={type}
         onChange={(e) => updateFilters({ type: e.target.value })}
-        style={{
-          padding: "0.5rem 2rem 0.5rem 0.75rem",
-          border: "1px solid #e2e8f0",
-          borderRadius: "0.375rem",
-          fontSize: "0.875rem",
-          backgroundColor: "white",
-        }}
+        className="px-3 py-2 pr-8 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent cursor-pointer"
       >
         <option value="all">All Types</option>
         <option value="BUSINESS">Business</option>
@@ -144,16 +97,16 @@ export function CustomerFilters({ search, status, type }: CustomerFiltersProps) 
       </select>
 
       {/* Clear filters */}
-      {(search || status !== "ACTIVE" || type !== "all") && (
+      {hasActiveFilters && (
         <button
           onClick={() => {
             setSearchValue("");
             router.push("/dashboard/customers");
           }}
-          className="btn btn-secondary"
-          style={{ fontSize: "0.875rem" }}
+          className="inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
         >
-          Clear Filters
+          <X className="w-4 h-4" />
+          Clear
         </button>
       )}
     </div>
