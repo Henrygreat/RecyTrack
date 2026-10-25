@@ -3,8 +3,9 @@ FROM node:22-alpine AS deps
 WORKDIR /app
 COPY package*.json ./
 COPY .npmrc* ./
-# Use --omit=optional for cross-platform builds (WASM fallbacks are used)
-RUN npm ci --omit=optional
+# Install all dependencies including optional native binaries (lightningcss, @next/swc)
+# Required for Alpine Linux (musl libc) - the lockfile contains platform-specific binaries
+RUN npm ci
 
 # Stage 2: Build the application
 FROM node:22-alpine AS builder
@@ -26,7 +27,8 @@ RUN apk add --no-cache openssl
 WORKDIR /app
 COPY package*.json ./
 COPY .npmrc* ./
-RUN npm ci --omit=dev --omit=optional && npm cache clean --force
+# Include optional native deps in case runtime needs them (e.g., for dynamic CSS)
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Stage 4: Production runtime
 FROM node:22-alpine AS runner
