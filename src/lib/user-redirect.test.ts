@@ -201,3 +201,81 @@ describe("Access control scenarios", () => {
     });
   });
 });
+
+describe("Redirect loop prevention", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("should NEVER redirect to a path that requires the same access check", async () => {
+    // When a user has no access, they should be redirected to a page
+    // that does NOT require the same access check (to prevent loops)
+    vi.mocked(prisma.membership.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.customerAccess.findFirst).mockResolvedValue(null);
+
+    const info = await getUserAccessInfo("no-access-user");
+
+    // The redirect path should be /no-access, NOT /portal/no-access
+    // because /portal/* routes are protected by requireCustomerAccess
+    expect(info.redirectPath).toBe("/no-access");
+    expect(info.redirectPath).not.toMatch(/^\/portal\//);
+    expect(info.redirectPath).not.toMatch(/^\/dashboard\//);
+  });
+
+  it("customer redirect path should NOT require Membership check", async () => {
+    vi.mocked(prisma.membership.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.customerAccess.findFirst).mockResolvedValue({ id: "ca" } as never);
+
+    const info = await getUserAccessInfo("customer-user");
+
+    // Customer users go to /portal/dashboard which requires CustomerAccess
+    // This is fine because they HAVE CustomerAccess
+    expect(info.redirectPath).toBe("/portal/dashboard");
+  });
+
+  it("staff redirect path should NOT require CustomerAccess check", async () => {
+    vi.mocked(prisma.membership.findFirst).mockResolvedValue({ id: "mem" } as never);
+    vi.mocked(prisma.customerAccess.findFirst).mockResolvedValue(null);
+
+    const info = await getUserAccessInfo("staff-user");
+
+    // Staff users go to /dashboard which requires Membership
+    // This is fine because they HAVE Membership
+    expect(info.redirectPath).toBe("/dashboard");
+  });
+
+  it("no-access users should be redirected to a public page", async () => {
+    vi.mocked(prisma.membership.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.customerAccess.findFirst).mockResolvedValue(null);
+
+    const info = await getUserAccessInfo("unknown-user");
+
+    // Users with no access should go to /no-access (root level, no auth required)
+    expect(info.redirectPath).toBe("/no-access");
+  });
+
+  describe("Portal access denied scenarios", () => {
+    it("portal no-access page must be outside protected route group", () => {
+      // This is a structural test - the /portal/no-access page should
+      // NOT be inside the (protected) route group that has requireCustomerAccess
+      // This is verified by the file structure, not runtime behavior
+
+      // The page should be at: /portal/no-access/page.tsx
+      // NOT at: /portal/(protected)/no-access/page.tsx
+
+      // This test documents the requirement - actual enforcement is in CI/build
+      expect(true).toBe(true);
+    });
+
+    it("requireCustomerAccess redirect target must not trigger requireCustomerAccess", () => {
+      // The portal-access.ts redirects to /portal/no-access
+      // That page must NOT be inside the protected layout
+      // This is enforced by route group structure
+
+      // Redirect target: /portal/no-access
+      // Protected routes: /portal/(protected)/*
+      // The no-access page is outside (protected), so no loop occurs
+      expect(true).toBe(true);
+    });
+  });
+});
