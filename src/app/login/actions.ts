@@ -20,10 +20,12 @@ export async function login(
   }
 
   try {
+    // Redirect to auth callback which determines the correct destination
+    // based on user's access type (staff vs customer)
     await signIn("credentials", {
       email: String(email),
       password: String(password),
-      redirectTo: "/dashboard",
+      redirectTo: "/auth/callback",
     });
     // signIn redirects on success, so this line is never reached
     return {};

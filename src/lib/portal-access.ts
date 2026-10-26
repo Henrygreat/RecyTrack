@@ -85,15 +85,9 @@ export async function requireCustomerAccess(
   });
 
   if (!customerAccess) {
-    // Check if user has staff membership - if so, redirect them to admin dashboard
-    const membership = await prisma.membership.findFirst({
-      where: { userId },
-    });
-
-    if (membership) {
-      redirect("/dashboard");
-    }
-
+    // User has no CustomerAccess - redirect to portal no-access page
+    // The no-access page will check if user is staff and show appropriate message
+    // Staff can access portal if they have a CustomerAccess record (for preview/testing)
     redirect("/portal/no-access");
   }
 
