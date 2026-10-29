@@ -24,16 +24,24 @@ export default async function Dashboard() {
   const { organizationId, membership } = await requireMember();
 
   // Fetch real metrics from the database
+  // Get date ranges for weekly data
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const weekAgo = new Date(today);
+  weekAgo.setDate(weekAgo.getDate() - 7);
+
   const [
     customerCount,
     collectionCount,
     assetCount,
     pendingCollections,
+    inTransitCount,
     upcomingCollections,
     recentCollections,
     collectionsByStatus,
     collectionsThisMonth,
     collectionsLastMonth,
+    weeklyCollections,
   ] = await Promise.all([
     prisma.customer.count({ where: { organizationId } }),
     prisma.collection.count({ where: { organizationId } }),
@@ -41,13 +49,19 @@ export default async function Dashboard() {
     prisma.collection.count({
       where: {
         organizationId,
-        status: { in: ["REQUESTED", "CONFIRMED", "ASSIGNED"] },
+        status: { in: ["REQUESTED", "APPROVED", "SCHEDULED", "ASSIGNED"] },
+      },
+    }),
+    prisma.collection.count({
+      where: {
+        organizationId,
+        status: { in: ["IN_TRANSIT", "COLLECTED"] },
       },
     }),
     prisma.collection.findMany({
       where: {
         organizationId,
-        status: { in: ["CONFIRMED", "ASSIGNED"] },
+        status: { in: ["SCHEDULED", "ASSIGNED"] },
         routeDate: { serviceDate: { gte: new Date() } },
       },
       include: {
@@ -85,6 +99,14 @@ export default async function Dashboard() {
         },
       },
     }),
+    // Get collections created in the last 7 days, grouped by day
+    prisma.collection.findMany({
+      where: {
+        organizationId,
+        createdAt: { gte: weekAgo },
+      },
+      select: { createdAt: true },
+    }),
   ]);
 
   // Calculate month-over-month trend
@@ -102,16 +124,26 @@ export default async function Dashboard() {
     color: getStatusColor(item.status),
   }));
 
-  // Prepare weekly trend data (mock for now - in real app would query by date)
-  const weeklyData = [
-    { name: "Mon", value: Math.floor(Math.random() * 10) + 5 },
-    { name: "Tue", value: Math.floor(Math.random() * 10) + 5 },
-    { name: "Wed", value: Math.floor(Math.random() * 10) + 5 },
-    { name: "Thu", value: Math.floor(Math.random() * 10) + 5 },
-    { name: "Fri", value: Math.floor(Math.random() * 10) + 5 },
-    { name: "Sat", value: Math.floor(Math.random() * 5) + 2 },
-    { name: "Sun", value: Math.floor(Math.random() * 3) + 1 },
-  ];
+  // Prepare weekly trend data from real collections
+  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const weeklyCountByDay: Record<number, number> = {};
+
+  // Initialize all days of the week
+  for (let i = 0; i < 7; i++) {
+    weeklyCountByDay[i] = 0;
+  }
+
+  // Count collections by day of week
+  weeklyCollections.forEach((c) => {
+    const day = new Date(c.createdAt).getDay();
+    weeklyCountByDay[day]++;
+  });
+
+  // Create ordered array starting from Monday
+  const weeklyData = [1, 2, 3, 4, 5, 6, 0].map((dayIndex) => ({
+    name: dayNames[dayIndex],
+    value: weeklyCountByDay[dayIndex],
+  }));
 
   return (
     <>
@@ -132,7 +164,7 @@ export default async function Dashboard() {
       />
 
       {/* Bento Grid Layout */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <MetricCard
           title="Total Customers"
           value={customerCount}
@@ -152,6 +184,29 @@ export default async function Dashboard() {
           icon={Clock}
           subtitle={pendingCollections > 0 ? "Requires attention" : "All clear"}
         />
+        <MetricCard
+          title="In Transit"
+          value={inTransitCount}
+          icon={Truck}
+          subtitle={inTransitCount > 0 ? "On the road" : "None active"}
+        />
+      </div>
+
+      {/* Driver Quick Access */}
+      <div className="mb-6">
+        <Link
+          href="/dashboard/driver"
+          className="flex items-center gap-3 p-4 bg-gradient-to-r from-teal-50 to-cyan-50 border border-teal-200 rounded-lg hover:from-teal-100 hover:to-cyan-100 transition-colors"
+        >
+          <div className="p-2 bg-teal-600 rounded-lg">
+            <Truck className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex-1">
+            <p className="font-medium text-teal-900">Driver Dashboard</p>
+            <p className="text-sm text-teal-700">View and manage your assigned collections</p>
+          </div>
+          <ArrowRight className="w-5 h-5 text-teal-600" />
+        </Link>
       </div>
 
       {/* Charts Row */}
@@ -334,13 +389,17 @@ export default async function Dashboard() {
 
 function getStatusColor(status: string): string {
   const colors: Record<string, string> = {
+    DRAFT: "#94a3b8",
     REQUESTED: "#f59e0b",
-    CONFIRMED: "#3b82f6",
-    ASSIGNED: "#8b5cf6",
+    APPROVED: "#3b82f6",
+    SCHEDULED: "#8b5cf6",
+    ASSIGNED: "#a855f7",
     IN_TRANSIT: "#06b6d4",
     COLLECTED: "#10b981",
     RECEIVED: "#059669",
+    COMPLETED: "#047857",
     CANCELLED: "#ef4444",
+    EXCEPTION: "#dc2626",
   };
   return colors[status] || "#64748b";
 }

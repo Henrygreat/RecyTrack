@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { Mail, Shield, AlertCircle } from "lucide-react";
+import { Mail, Shield, AlertCircle, CheckCircle2 } from "lucide-react";
 import { createInvitation, type InvitationActionState } from "../actions";
 import type { Site } from "@prisma/client";
 
@@ -24,40 +24,21 @@ export function InvitationForm({ customerId, customerName, sites = [], onSuccess
 
   useEffect(() => {
     if (state.success) {
-      if (onSuccess && state.invitationId) {
-        onSuccess(state.invitationId);
-      } else {
-        router.push(`/dashboard/customers/${customerId}?tab=access`);
-      }
+      // Auto-redirect after 2 seconds to show the success message
+      const timeout = setTimeout(() => {
+        if (onSuccess && state.invitationId) {
+          onSuccess(state.invitationId);
+        } else {
+          router.push(`/dashboard/customers/${customerId}?tab=access`);
+        }
+      }, 2000);
+      return () => clearTimeout(timeout);
     }
   }, [state.success, state.invitationId, customerId, router, onSuccess]);
 
   return (
     <form action={formAction} className="form">
       <input type="hidden" name="customerId" value={customerId} />
-
-      {/* Warning about email */}
-      <div
-        style={{
-          padding: "0.75rem 1rem",
-          backgroundColor: "#fef3c7",
-          border: "1px solid #fde68a",
-          borderRadius: "0.375rem",
-          marginBottom: "1rem",
-          display: "flex",
-          gap: "0.75rem",
-          alignItems: "flex-start",
-        }}
-      >
-        <AlertCircle className="w-5 h-5 text-amber-600" style={{ flexShrink: 0, marginTop: "0.125rem" }} />
-        <div>
-          <strong style={{ color: "#b45309" }}>Email delivery pending</strong>
-          <p style={{ color: "#92400e", fontSize: "0.875rem", margin: "0.25rem 0 0 0" }}>
-            The invitation will be created but email delivery is not yet configured.
-            You will need to manually share the invitation link with the user.
-          </p>
-        </div>
-      </div>
 
       {/* Error Display */}
       {state.error && (
@@ -75,19 +56,54 @@ export function InvitationForm({ customerId, customerName, sites = [], onSuccess
         </div>
       )}
 
-      {/* Success Display */}
-      {state.success && state.emailPending && (
+      {/* Success with Email Sent */}
+      {state.success && state.emailSent && (
         <div
           style={{
             padding: "0.75rem 1rem",
             backgroundColor: "#d1fae5",
             border: "1px solid #a7f3d0",
             borderRadius: "0.375rem",
-            color: "#065f46",
             marginBottom: "1rem",
+            display: "flex",
+            gap: "0.75rem",
+            alignItems: "flex-start",
           }}
         >
-          Invitation created successfully. Email delivery is pending.
+          <CheckCircle2 className="w-5 h-5 text-emerald-600" style={{ flexShrink: 0, marginTop: "0.125rem" }} />
+          <div>
+            <strong style={{ color: "#065f46" }}>Invitation sent successfully</strong>
+            <p style={{ color: "#047857", fontSize: "0.875rem", margin: "0.25rem 0 0 0" }}>
+              The invitation email has been delivered. Redirecting...
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Success but Email Failed */}
+      {state.success && !state.emailSent && state.emailError && (
+        <div
+          style={{
+            padding: "0.75rem 1rem",
+            backgroundColor: "#fef3c7",
+            border: "1px solid #fde68a",
+            borderRadius: "0.375rem",
+            marginBottom: "1rem",
+            display: "flex",
+            gap: "0.75rem",
+            alignItems: "flex-start",
+          }}
+        >
+          <AlertCircle className="w-5 h-5 text-amber-600" style={{ flexShrink: 0, marginTop: "0.125rem" }} />
+          <div>
+            <strong style={{ color: "#b45309" }}>Invitation created - Email not sent</strong>
+            <p style={{ color: "#92400e", fontSize: "0.875rem", margin: "0.25rem 0 0 0" }}>
+              {state.emailError}
+            </p>
+            <p style={{ color: "#92400e", fontSize: "0.875rem", margin: "0.25rem 0 0 0" }}>
+              The invitation has been created. You can resend the email from the Access tab.
+            </p>
+          </div>
         </div>
       )}
 

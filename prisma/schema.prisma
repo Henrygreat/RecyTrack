@@ -36,13 +36,32 @@ enum CustomerStatus {
 }
 
 enum CollectionStatus {
+  DRAFT
   REQUESTED
-  CONFIRMED
+  APPROVED
+  SCHEDULED
   ASSIGNED
   IN_TRANSIT
   COLLECTED
   RECEIVED
+  COMPLETED
   CANCELLED
+  EXCEPTION
+}
+
+enum CollectionPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum CollectionType {
+  STANDARD
+  SECURE_DATA
+  HAZARDOUS
+  LARGE_ITEMS
+  MIXED
 }
 
 enum BookingMode {
@@ -168,6 +187,7 @@ model Site {
   zone                  CollectionZone? @relation(fields: [zoneId, organizationId], references: [id, organizationId])
   contacts              CustomerContact[]
   siteAccess            SiteAccess[]
+  collections           Collection[]
 
   @@unique([organizationId, reference])
   @@unique([id, organizationId])
@@ -251,6 +271,15 @@ model CustomerInvitation {
   invitedByUserId String
   createdAt      DateTime      @default(now())
 
+  // Email delivery tracking
+  emailSentAt     DateTime?    // When email was sent to provider
+  emailMessageId  String?      // Resend message ID for tracking
+  emailDeliveredAt DateTime?   // When provider confirmed delivery
+  emailFailedAt   DateTime?    // When delivery failed
+  emailFailureReason String?   // Error message from provider
+  lastResendAt    DateTime?    // Last time invitation was resent
+  resendCount     Int          @default(0)
+
   organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   customer       Customer      @relation(fields: [customerId, organizationId], references: [id, organizationId], onDelete: Cascade)
   invitedBy      User          @relation("InvitedBy", fields: [invitedByUserId], references: [id])
@@ -259,6 +288,7 @@ model CustomerInvitation {
   @@index([customerId])
   @@index([email])
   @@index([organizationId, expiresAt])
+  @@index([emailMessageId])
 }
 
 // ============================================
@@ -298,27 +328,94 @@ model Collection {
   organizationId String
   reference      String
   customerId     String
+  siteId         String?          // Optional link to site
   routeDateId    String?
-  bookingMode    BookingMode      @default(ALTERNATIVE)
-  requestedDate  DateTime?        @db.Date
-  status         CollectionStatus @default(REQUESTED)
-  address        String
-  postcode       String
-  itemEstimate   Int              @default(0)
-  notes          String?
-  driverName     String?
-  collectedAt    DateTime?
-  receivedAt     DateTime?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer       Customer         @relation(fields: [customerId, organizationId], references: [id, organizationId])
-  routeDate      RouteDate?       @relation(fields: [routeDateId, organizationId], references: [id, organizationId])
-  assets         Asset[]
+
+  // Booking details
+  bookingMode      BookingMode        @default(ALTERNATIVE)
+  collectionType   CollectionType     @default(STANDARD)
+  priority         CollectionPriority @default(NORMAL)
+  requestedDate    DateTime?          @db.Date
+  scheduledDate    DateTime?          @db.Date
+  status           CollectionStatus   @default(DRAFT)
+
+  // Location
+  address          String
+  postcode         String
+
+  // Contact
+  contactName      String?
+  contactPhone     String?
+  contactEmail     String?
+
+  // Equipment
+  equipmentCategories String[]       // e.g. ["Laptops", "Desktops", "Monitors"]
+  itemEstimate     Int              @default(0)
+  actualItemCount  Int?
+
+  // Instructions
+  specialHandling    String?        // Special handling requirements
+  customerInstructions String?      // Instructions from customer
+  internalNotes      String?        // Staff-only notes
+  notes              String?        // Legacy field, kept for compatibility
+
+  // Assignment
+  driverId         String?          // Assigned driver user ID
+  driverName       String?          // Driver display name
+  vehicleReg       String?          // Vehicle registration
+
+  // Timestamps
+  approvedAt       DateTime?
+  assignedAt       DateTime?
+  dispatchedAt     DateTime?        // When driver departed
+  collectedAt      DateTime?
+  receivedAt       DateTime?
+  completedAt      DateTime?
+  cancelledAt      DateTime?
+
+  // Exception handling
+  exceptionReason  String?
+  exceptionNotes   String?
+
+  // Proof of collection
+  signatureName    String?          // Name of person who signed
+  signatureData    String?          // Base64 signature image
+  proofPhotos      String[]         // Array of photo URLs
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer         Customer         @relation(fields: [customerId, organizationId], references: [id, organizationId])
+  site             Site?            @relation(fields: [siteId, organizationId], references: [id, organizationId])
+  routeDate        RouteDate?       @relation(fields: [routeDateId, organizationId], references: [id, organizationId])
+  assets           Asset[]
+  statusHistory    CollectionStatusChange[]
 
   @@unique([organizationId, reference])
   @@unique([id, organizationId])
   @@index([organizationId, status, createdAt])
+  @@index([organizationId, scheduledDate])
+  @@index([driverId, status])
+  @@index([customerId, status])
+}
+
+model CollectionStatusChange {
+  id             String           @id @default(cuid())
+  collectionId   String
+  organizationId String
+  fromStatus     CollectionStatus?
+  toStatus       CollectionStatus
+  changedByUserId String?
+  changedByName  String?
+  reason         String?
+  notes          String?
+  createdAt      DateTime         @default(now())
+
+  collection     Collection       @relation(fields: [collectionId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@index([collectionId])
+  @@index([organizationId, createdAt])
 }
 
 model Asset {

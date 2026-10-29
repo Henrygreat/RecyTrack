@@ -15,6 +15,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { randomBytes } from "node:crypto";
 import type { CustomerStatus } from "@prisma/client";
+import { sendInvitationEmail, isEmailConfigured } from "@/lib/email";
 
 // ============================================
 // HELPER FUNCTIONS
@@ -723,7 +724,8 @@ export type InvitationActionState = {
   error?: string;
   success?: boolean;
   invitationId?: string;
-  emailPending?: boolean;
+  emailSent?: boolean;
+  emailError?: string;
 };
 
 export async function createInvitation(
@@ -794,6 +796,13 @@ export async function createInvitation(
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 day expiry
 
+    // Get inviter name for email
+    const inviter = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, email: true },
+    });
+    const inviterName = inviter?.name || inviter?.email || "A team member";
+
     const invitation = await prisma.$transaction(async (tx) => {
       const inv = await tx.customerInvitation.create({
         data: {
@@ -826,18 +835,148 @@ export async function createInvitation(
       return inv;
     });
 
-    // TODO: Email delivery is not yet implemented
-    // When email infrastructure is ready, send invitation email here
+    // Send invitation email
+    let emailSent = false;
+    let emailError: string | undefined;
+
+    if (isEmailConfigured()) {
+      const emailResult = await sendInvitationEmail({
+        to: data.email,
+        customerName: customer.name,
+        invitedByName: inviterName,
+        role: data.role,
+        token,
+        expiresAt,
+      });
+
+      if (emailResult.success) {
+        emailSent = true;
+        // Update invitation with email tracking info
+        await prisma.customerInvitation.update({
+          where: { id: invitation.id },
+          data: {
+            emailSentAt: new Date(),
+            emailMessageId: emailResult.messageId,
+          },
+        });
+      } else {
+        emailError = emailResult.error;
+        // Track email failure
+        await prisma.customerInvitation.update({
+          where: { id: invitation.id },
+          data: {
+            emailFailedAt: new Date(),
+            emailFailureReason: emailResult.error,
+          },
+        });
+      }
+    } else {
+      emailError = "Email service not configured. Set RESEND_API_KEY environment variable.";
+    }
 
     revalidatePath(`/dashboard/customers/${data.customerId}`);
     return {
       success: true,
       invitationId: invitation.id,
-      emailPending: true, // Email not actually sent yet
+      emailSent,
+      emailError,
     };
   } catch (error) {
     console.error("Create invitation error:", error);
     return { error: "Failed to create invitation. Please try again." };
+  }
+}
+
+export async function resendInvitation(invitationId: string): Promise<InvitationActionState> {
+  try {
+    const { organizationId, userId } = await requireMember(undefined, MANAGEMENT_ROLES);
+
+    const invitation = await prisma.customerInvitation.findFirst({
+      where: { id: invitationId, organizationId },
+      include: {
+        customer: { select: { name: true } },
+      },
+    });
+
+    if (!invitation) {
+      return { error: "Invitation not found" };
+    }
+
+    if (invitation.acceptedAt) {
+      return { error: "Invitation has already been accepted" };
+    }
+
+    if (invitation.revokedAt) {
+      return { error: "Invitation has been revoked" };
+    }
+
+    if (invitation.expiresAt < new Date()) {
+      return { error: "Invitation has expired. Please create a new invitation." };
+    }
+
+    if (!isEmailConfigured()) {
+      return { error: "Email service not configured. Set RESEND_API_KEY environment variable." };
+    }
+
+    // Get inviter name for email
+    const inviter = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, email: true },
+    });
+    const inviterName = inviter?.name || inviter?.email || "A team member";
+
+    const emailResult = await sendInvitationEmail({
+      to: invitation.email,
+      customerName: invitation.customer.name,
+      invitedByName: inviterName,
+      role: invitation.role,
+      token: invitation.token,
+      expiresAt: invitation.expiresAt,
+    });
+
+    if (emailResult.success) {
+      await prisma.$transaction(async (tx) => {
+        await tx.customerInvitation.update({
+          where: { id: invitationId },
+          data: {
+            emailSentAt: new Date(),
+            emailMessageId: emailResult.messageId,
+            lastResendAt: new Date(),
+            resendCount: { increment: 1 },
+            emailFailedAt: null,
+            emailFailureReason: null,
+          },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            organizationId,
+            actorUserId: userId,
+            action: "INVITATION_RESENT",
+            entityType: "CustomerInvitation",
+            entityId: invitationId,
+            details: { email: invitation.email },
+          },
+        });
+      });
+
+      revalidatePath(`/dashboard/customers/${invitation.customerId}`);
+      return { success: true, emailSent: true };
+    } else {
+      await prisma.customerInvitation.update({
+        where: { id: invitationId },
+        data: {
+          emailFailedAt: new Date(),
+          emailFailureReason: emailResult.error,
+        },
+      });
+
+      revalidatePath(`/dashboard/customers/${invitation.customerId}`);
+      return { success: false, emailError: emailResult.error };
+    }
+  } catch (error) {
+    console.error("Resend invitation error:", error);
+    return { error: "Failed to resend invitation. Please try again." };
   }
 }
 

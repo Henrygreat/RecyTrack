@@ -30,16 +30,34 @@ export function Badge({ variant = "default", className = "", children, ...props 
 // Collection status badge helper
 export function CollectionStatusBadge({ status }: { status: string }) {
   const statusConfig: Record<string, { variant: BadgeVariant; label: string }> = {
+    DRAFT: { variant: "default", label: "Draft" },
     REQUESTED: { variant: "warning", label: "Requested" },
-    CONFIRMED: { variant: "info", label: "Confirmed" },
+    APPROVED: { variant: "info", label: "Approved" },
+    SCHEDULED: { variant: "info", label: "Scheduled" },
     ASSIGNED: { variant: "info", label: "Assigned" },
-    IN_TRANSIT: { variant: "info", label: "In Transit" },
+    IN_TRANSIT: { variant: "secondary", label: "In Transit" },
     COLLECTED: { variant: "success", label: "Collected" },
     RECEIVED: { variant: "success", label: "Received" },
+    COMPLETED: { variant: "success", label: "Completed" },
     CANCELLED: { variant: "error", label: "Cancelled" },
+    EXCEPTION: { variant: "error", label: "Exception" },
   };
 
   const config = statusConfig[status] || { variant: "default" as BadgeVariant, label: status };
+
+  return <Badge variant={config.variant}>{config.label}</Badge>;
+}
+
+// Priority badge helper
+export function PriorityBadge({ priority }: { priority: string }) {
+  const priorityConfig: Record<string, { variant: BadgeVariant; label: string }> = {
+    LOW: { variant: "default", label: "Low" },
+    NORMAL: { variant: "info", label: "Normal" },
+    HIGH: { variant: "warning", label: "High" },
+    URGENT: { variant: "error", label: "Urgent" },
+  };
+
+  const config = priorityConfig[priority] || { variant: "default" as BadgeVariant, label: priority };
 
   return <Badge variant={config.variant}>{config.label}</Badge>;
 }

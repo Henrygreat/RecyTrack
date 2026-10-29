@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useTransition } from "react";
 import {
   Building,
   MapPinned,
@@ -20,9 +21,14 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  RotateCw,
+  Trash2,
+  Send,
+  Loader2,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { resendInvitation, revokeInvitation, removeCustomerAccess } from "../../actions";
 import type { Customer, Site, CustomerContact, Collection, CustomerAccess, CustomerInvitation, AuditLog, User } from "@prisma/client";
 
 interface CustomerTabsProps {
@@ -529,38 +535,142 @@ function AccessTab({
           <CardContent>
             <div style={{ display: "grid", gap: "0.5rem" }}>
               {invitations.map((invitation) => (
-                <div
+                <InvitationRow
                   key={invitation.id}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "0.75rem 1rem",
-                    border: "1px solid #fef3c7",
-                    backgroundColor: "#fffbeb",
-                    borderRadius: "0.5rem",
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: "500" }}>{invitation.email}</div>
-                    <div style={{ fontSize: "0.75rem", color: "#64748b" }}>
-                      Expires: {invitation.expiresAt.toLocaleDateString("en-GB")}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                    <span className="badge" style={{ backgroundColor: "#fef3c7", color: "#b45309" }}>
-                      Pending
-                    </span>
-                    <span style={{ fontSize: "0.75rem", color: "#dc2626" }}>
-                      Email not sent
-                    </span>
-                  </div>
-                </div>
+                  invitation={invitation}
+                  canManage={canManage}
+                />
               ))}
             </div>
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
+
+function InvitationRow({
+  invitation,
+  canManage
+}: {
+  invitation: CustomerInvitation;
+  canManage: boolean;
+}) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  const handleResend = () => {
+    startTransition(async () => {
+      const result = await resendInvitation(invitation.id);
+      if (result.error) {
+        alert(result.error);
+      }
+      router.refresh();
+    });
+  };
+
+  const handleRevoke = () => {
+    if (!confirm("Are you sure you want to revoke this invitation?")) return;
+    startTransition(async () => {
+      const result = await revokeInvitation(invitation.id);
+      if (result.error) {
+        alert(result.error);
+      }
+      router.refresh();
+    });
+  };
+
+  // Determine email status
+  const emailSent = !!invitation.emailSentAt;
+  const emailFailed = !!invitation.emailFailedAt;
+  const resendCount = invitation.resendCount || 0;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "0.75rem 1rem",
+        border: emailFailed ? "1px solid #fecaca" : emailSent ? "1px solid #bbf7d0" : "1px solid #fef3c7",
+        backgroundColor: emailFailed ? "#fef2f2" : emailSent ? "#f0fdf4" : "#fffbeb",
+        borderRadius: "0.5rem",
+      }}
+    >
+      <div>
+        <div style={{ fontWeight: "500" }}>{invitation.email}</div>
+        <div style={{ fontSize: "0.75rem", color: "#64748b" }}>
+          Expires: {new Date(invitation.expiresAt).toLocaleDateString("en-GB")}
+          {resendCount > 0 && ` • Resent ${resendCount} time${resendCount > 1 ? "s" : ""}`}
+        </div>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        {/* Email Status Badge */}
+        {emailFailed ? (
+          <span
+            className="badge"
+            style={{ backgroundColor: "#fef2f2", color: "#dc2626" }}
+            title={invitation.emailFailureReason || "Email delivery failed"}
+          >
+            <XCircle className="w-3 h-3" style={{ marginRight: "0.25rem" }} />
+            Failed
+          </span>
+        ) : emailSent ? (
+          <span className="badge" style={{ backgroundColor: "#d1fae5", color: "#059669" }}>
+            <CheckCircle className="w-3 h-3" style={{ marginRight: "0.25rem" }} />
+            Sent
+          </span>
+        ) : (
+          <span className="badge" style={{ backgroundColor: "#fef3c7", color: "#b45309" }}>
+            <AlertCircle className="w-3 h-3" style={{ marginRight: "0.25rem" }} />
+            Not sent
+          </span>
+        )}
+
+        {/* Actions */}
+        {canManage && (
+          <div style={{ display: "flex", gap: "0.25rem" }}>
+            <button
+              onClick={handleResend}
+              disabled={isPending}
+              title="Resend invitation email"
+              style={{
+                padding: "0.375rem",
+                background: "none",
+                border: "1px solid #e2e8f0",
+                borderRadius: "0.25rem",
+                cursor: isPending ? "not-allowed" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin text-slate-400" />
+              ) : (
+                <Send className="w-4 h-4 text-slate-500" />
+              )}
+            </button>
+            <button
+              onClick={handleRevoke}
+              disabled={isPending}
+              title="Revoke invitation"
+              style={{
+                padding: "0.375rem",
+                background: "none",
+                border: "1px solid #fecaca",
+                borderRadius: "0.25rem",
+                cursor: isPending ? "not-allowed" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Trash2 className="w-4 h-4 text-red-500" />
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

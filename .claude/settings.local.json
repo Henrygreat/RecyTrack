@@ -23,7 +23,13 @@
       "Bash(git checkout:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Phase 2 - Customer, Site and User Management\n\nCustomer Management:\n- Extended Customer model with reference, type, company/VAT numbers, status\n- Customer list with search, filters, pagination, and status badges\n- Create/edit customer forms with validation\n- Archive and reactivate functionality\n- Duplicate prevention by name and email\n\nSite Management:\n- New Site model for multiple collection locations per customer\n- Site reference generation \\(SITE-XXXX\\)\n- Site contact, collection instructions, vehicle access notes\n- Zone association for collection routing\n- Default site designation\n\nContact Management:\n- CustomerContact model with role flags \\(primary, billing, operational\\)\n- Site-level or customer-level contact association\n- Contact management UI with role badges\n\nCustomer User Access:\n- CustomerAccess and SiteAccess models for portal permissions\n- CustomerInvitation with secure tokens and expiry\n- Invitation creation \\(email delivery pending\\)\n- Customer admin vs user role distinction\n\nDatabase:\n- New enums: CustomerRole, CustomerType, CustomerStatus\n- Migration: 20241025100000_phase2_customer_management\n- Audit logging for all customer/site/contact operations\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git restore:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(tree:*)",
+      "Bash(find:*)",
+      "Bash(npm install:*)",
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm test:*)"
     ]
   }
 }

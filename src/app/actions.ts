@@ -53,7 +53,9 @@ export async function createCollection(form:FormData) {
   revalidatePath("/dashboard/collections");redirect("/dashboard/collections");
 }
 
-const transitions:Record<CollectionStatus,CollectionStatus[]>={REQUESTED:["CONFIRMED","CANCELLED"],CONFIRMED:["ASSIGNED","CANCELLED"],ASSIGNED:["IN_TRANSIT","CANCELLED"],IN_TRANSIT:["COLLECTED","CANCELLED"],COLLECTED:["RECEIVED"],RECEIVED:[],CANCELLED:[]};
+// Use new status transitions from collections service
+import { STATUS_TRANSITIONS } from "@/lib/collections";
+const transitions = STATUS_TRANSITIONS;
 
 export async function updateCollectionStatus(form:FormData){
   const {organizationId,userId}=await requireMember(undefined,MANAGEMENT_ROLES);
@@ -61,8 +63,19 @@ export async function updateCollectionStatus(form:FormData){
   await prisma.$transaction(async tx=>{
     const existing=await tx.collection.findFirst({where:{id,organizationId}});
     if(!existing) throw new Error("Collection not found");
-    if(!transitions[existing.status].includes(status)) throw new Error("Invalid status transition");
-    await tx.collection.update({where:{id},data:{status,collectedAt:status==="COLLECTED"?new Date():undefined,receivedAt:status==="RECEIVED"?new Date():undefined}});
+    if(!transitions[existing.status]?.includes(status)) throw new Error("Invalid status transition");
+
+    // Build update data with appropriate timestamps
+    const updateData: Record<string, unknown> = { status };
+    if(status==="APPROVED") updateData.approvedAt = new Date();
+    if(status==="ASSIGNED") updateData.assignedAt = new Date();
+    if(status==="IN_TRANSIT") updateData.dispatchedAt = new Date();
+    if(status==="COLLECTED") updateData.collectedAt = new Date();
+    if(status==="RECEIVED") updateData.receivedAt = new Date();
+    if(status==="COMPLETED") updateData.completedAt = new Date();
+    if(status==="CANCELLED") updateData.cancelledAt = new Date();
+
+    await tx.collection.update({where:{id},data:updateData});
     await tx.auditLog.create({data:{organizationId,actorUserId:userId,action:"COLLECTION_STATUS_UPDATED",entityType:"Collection",entityId:id,details:{from:existing.status,to:status}}});
   });
   revalidatePath("/dashboard/collections");
