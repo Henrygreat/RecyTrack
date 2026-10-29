@@ -32,6 +32,7 @@ export function CollectionStatusBadge({ status }: { status: string }) {
   const statusConfig: Record<string, { variant: BadgeVariant; label: string }> = {
     DRAFT: { variant: "default", label: "Draft" },
     REQUESTED: { variant: "warning", label: "Requested" },
+    CONFIRMED: { variant: "info", label: "Confirmed" },  // Legacy status, equivalent to Approved
     APPROVED: { variant: "info", label: "Approved" },
     SCHEDULED: { variant: "info", label: "Scheduled" },
     ASSIGNED: { variant: "info", label: "Assigned" },

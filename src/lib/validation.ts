@@ -97,6 +97,7 @@ export const collectionSchema = z.object({
 export const statusSchema = z.enum([
   "DRAFT",
   "REQUESTED",
+  "CONFIRMED",  // Legacy status, equivalent to APPROVED
   "APPROVED",
   "SCHEDULED",
   "ASSIGNED",

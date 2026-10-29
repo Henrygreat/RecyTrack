@@ -38,6 +38,7 @@ enum CustomerStatus {
 enum CollectionStatus {
   DRAFT
   REQUESTED
+  CONFIRMED   // Legacy status - migrated to APPROVED, kept for backwards compatibility
   APPROVED
   SCHEDULED
   ASSIGNED

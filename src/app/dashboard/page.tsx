@@ -46,10 +46,12 @@ export default async function Dashboard() {
     prisma.customer.count({ where: { organizationId } }),
     prisma.collection.count({ where: { organizationId } }),
     prisma.asset.count({ where: { organizationId } }),
+    // Awaiting action: include both legacy (CONFIRMED) and new (APPROVED, SCHEDULED) statuses
+    // This ensures compatibility before and after Phase 3 migration
     prisma.collection.count({
       where: {
         organizationId,
-        status: { in: ["REQUESTED", "APPROVED", "SCHEDULED", "ASSIGNED"] },
+        status: { in: ["REQUESTED", "CONFIRMED", "APPROVED", "SCHEDULED", "ASSIGNED"] },
       },
     }),
     prisma.collection.count({
@@ -58,10 +60,12 @@ export default async function Dashboard() {
         status: { in: ["IN_TRANSIT", "COLLECTED"] },
       },
     }),
+    // Upcoming collections: include CONFIRMED (legacy) and SCHEDULED (new) alongside ASSIGNED
+    // This ensures compatibility before and after Phase 3 migration
     prisma.collection.findMany({
       where: {
         organizationId,
-        status: { in: ["SCHEDULED", "ASSIGNED"] },
+        status: { in: ["CONFIRMED", "SCHEDULED", "ASSIGNED"] },
         routeDate: { serviceDate: { gte: new Date() } },
       },
       include: {

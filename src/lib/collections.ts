@@ -4,9 +4,11 @@ import type { CollectionStatus, CollectionPriority, CollectionType } from "@pris
 // Valid status transitions
 // Draft → Requested → Approved → Scheduled → Assigned → In Transit → Collected → Received → Completed
 // Cancellation allowed from most states, Exception can occur during collection
+// CONFIRMED is legacy status (from Phase 1/2), treated same as APPROVED
 export const STATUS_TRANSITIONS: Record<CollectionStatus, CollectionStatus[]> = {
   DRAFT: ["REQUESTED", "CANCELLED"],
-  REQUESTED: ["APPROVED", "CANCELLED"],
+  REQUESTED: ["APPROVED", "CONFIRMED", "CANCELLED"],  // Allow both for flexibility
+  CONFIRMED: ["SCHEDULED", "APPROVED", "CANCELLED"],  // Legacy: can upgrade to APPROVED or proceed to SCHEDULED
   APPROVED: ["SCHEDULED", "CANCELLED"],
   SCHEDULED: ["ASSIGNED", "CANCELLED"],
   ASSIGNED: ["IN_TRANSIT", "CANCELLED"],
@@ -21,6 +23,7 @@ export const STATUS_TRANSITIONS: Record<CollectionStatus, CollectionStatus[]> = 
 export const STATUS_LABELS: Record<CollectionStatus, string> = {
   DRAFT: "Draft",
   REQUESTED: "Requested",
+  CONFIRMED: "Confirmed",  // Legacy status, equivalent to Approved
   APPROVED: "Approved",
   SCHEDULED: "Scheduled",
   ASSIGNED: "Assigned",
@@ -156,7 +159,7 @@ export function isTerminalStatus(status: CollectionStatus): boolean {
  * Check if collection is in active workflow
  */
 export function isActiveStatus(status: CollectionStatus): boolean {
-  return ["REQUESTED", "APPROVED", "SCHEDULED", "ASSIGNED", "IN_TRANSIT", "COLLECTED"].includes(status);
+  return ["REQUESTED", "CONFIRMED", "APPROVED", "SCHEDULED", "ASSIGNED", "IN_TRANSIT", "COLLECTED"].includes(status);
 }
 
 /**
@@ -205,7 +208,8 @@ export async function getCollectionMetrics(organizationId: string) {
     total: statusCounts.reduce((sum, s) => sum + s._count.status, 0),
     draft: countByStatus.DRAFT ?? 0,
     requested: countByStatus.REQUESTED ?? 0,
-    approved: countByStatus.APPROVED ?? 0,
+    confirmed: countByStatus.CONFIRMED ?? 0,  // Legacy status
+    approved: (countByStatus.APPROVED ?? 0) + (countByStatus.CONFIRMED ?? 0),  // Combine for reporting
     scheduled: countByStatus.SCHEDULED ?? 0,
     assigned: countByStatus.ASSIGNED ?? 0,
     inTransit: countByStatus.IN_TRANSIT ?? 0,
@@ -214,7 +218,8 @@ export async function getCollectionMetrics(organizationId: string) {
     completed: countByStatus.COMPLETED ?? 0,
     cancelled: countByStatus.CANCELLED ?? 0,
     exception: countByStatus.EXCEPTION ?? 0,
-    pending: (countByStatus.REQUESTED ?? 0) + (countByStatus.APPROVED ?? 0) + (countByStatus.SCHEDULED ?? 0),
+    // Include CONFIRMED in pending count (legacy status equivalent to approved)
+    pending: (countByStatus.REQUESTED ?? 0) + (countByStatus.CONFIRMED ?? 0) + (countByStatus.APPROVED ?? 0) + (countByStatus.SCHEDULED ?? 0),
     active: (countByStatus.ASSIGNED ?? 0) + (countByStatus.IN_TRANSIT ?? 0) + (countByStatus.COLLECTED ?? 0),
     todayScheduled: todayCollections,
     thisWeekCompleted,

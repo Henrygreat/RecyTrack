@@ -10,9 +10,11 @@ import { MetricCard } from "@/components/ui/metric-card";
 import { EmptyState } from "@/components/ui/empty-state";
 
 // Primary workflow actions (excludes CANCELLED and EXCEPTION branches)
+// CONFIRMED is legacy status, treated same as APPROVED for workflow transitions
 const nextStatus: Record<string, string | undefined> = {
   DRAFT: "REQUESTED",
   REQUESTED: "APPROVED",
+  CONFIRMED: "SCHEDULED",  // Legacy status, proceed to SCHEDULED
   APPROVED: "SCHEDULED",
   SCHEDULED: "ASSIGNED",
   ASSIGNED: "IN_TRANSIT",
@@ -54,9 +56,9 @@ export default async function Collections() {
 
   const canManage = MANAGEMENT_ROLES.includes(membership.role);
 
-  // Calculate metrics
+  // Calculate metrics (include CONFIRMED as legacy equivalent of APPROVED)
   const pendingCount = statusCounts
-    .filter((s) => ["DRAFT", "REQUESTED", "APPROVED", "SCHEDULED"].includes(s.status))
+    .filter((s) => ["DRAFT", "REQUESTED", "CONFIRMED", "APPROVED", "SCHEDULED"].includes(s.status))
     .reduce((sum, s) => sum + s._count.status, 0);
   const inProgressCount = statusCounts
     .filter((s) => ["ASSIGNED", "IN_TRANSIT", "COLLECTED", "RECEIVED"].includes(s.status))

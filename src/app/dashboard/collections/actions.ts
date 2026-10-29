@@ -42,7 +42,7 @@ const updateCollectionSchema = createCollectionSchema.extend({
 const statusChangeSchema = z.object({
   id: z.string().min(1),
   status: z.enum([
-    "DRAFT", "REQUESTED", "APPROVED", "SCHEDULED", "ASSIGNED",
+    "DRAFT", "REQUESTED", "CONFIRMED", "APPROVED", "SCHEDULED", "ASSIGNED",
     "IN_TRANSIT", "COLLECTED", "RECEIVED", "COMPLETED", "CANCELLED", "EXCEPTION"
   ]),
   reason: z.string().optional(),
@@ -462,8 +462,8 @@ export async function assignDriver(
       return { error: "Collection not found" };
     }
 
-    // Can assign driver when APPROVED, SCHEDULED, or re-assigning
-    if (!["APPROVED", "SCHEDULED", "ASSIGNED"].includes(collection.status)) {
+    // Can assign driver when APPROVED/CONFIRMED (legacy), SCHEDULED, or re-assigning
+    if (!["CONFIRMED", "APPROVED", "SCHEDULED", "ASSIGNED"].includes(collection.status)) {
       return { error: "Collection must be approved before assigning a driver" };
     }
 
@@ -484,8 +484,9 @@ export async function assignDriver(
       }
 
       // If assigning driver and collection is approved/scheduled, move to ASSIGNED
+      // Include CONFIRMED for backwards compatibility with legacy data
       if (driverId || driverName) {
-        if (["APPROVED", "SCHEDULED"].includes(collection.status)) {
+        if (["CONFIRMED", "APPROVED", "SCHEDULED"].includes(collection.status)) {
           updateData.status = "ASSIGNED";
           updateData.assignedAt = new Date();
 

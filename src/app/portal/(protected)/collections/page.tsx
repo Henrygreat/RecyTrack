@@ -14,7 +14,7 @@ interface PageProps {
 }
 
 const validStatuses: CollectionStatus[] = [
-  "DRAFT", "REQUESTED", "APPROVED", "SCHEDULED", "ASSIGNED",
+  "DRAFT", "REQUESTED", "CONFIRMED", "APPROVED", "SCHEDULED", "ASSIGNED",
   "IN_TRANSIT", "COLLECTED", "RECEIVED", "COMPLETED", "CANCELLED", "EXCEPTION"
 ];
 
@@ -56,6 +56,7 @@ export default async function PortalCollections({ searchParams }: PageProps) {
   const statusColors: Record<string, { bg: string; text: string; label: string }> = {
     DRAFT: { bg: "#f1f5f9", text: "#64748b", label: "Draft" },
     REQUESTED: { bg: "#fef3c7", text: "#b45309", label: "Requested" },
+    CONFIRMED: { bg: "#dbeafe", text: "#1e40af", label: "Confirmed" },  // Legacy status
     APPROVED: { bg: "#dbeafe", text: "#1e40af", label: "Approved" },
     SCHEDULED: { bg: "#e0e7ff", text: "#4338ca", label: "Scheduled" },
     ASSIGNED: { bg: "#e0e7ff", text: "#4338ca", label: "Assigned" },
