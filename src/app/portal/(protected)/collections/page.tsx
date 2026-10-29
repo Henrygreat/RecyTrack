@@ -4,6 +4,7 @@ import { requireCustomerAccess } from "@/lib/portal-access";
 import { prisma } from "@/lib/prisma";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
+import type { CollectionStatus } from "@prisma/client";
 
 interface PageProps {
   searchParams: Promise<{
@@ -11,6 +12,11 @@ interface PageProps {
     page?: string;
   }>;
 }
+
+const validStatuses: CollectionStatus[] = [
+  "DRAFT", "REQUESTED", "APPROVED", "SCHEDULED", "ASSIGNED",
+  "IN_TRANSIT", "COLLECTED", "RECEIVED", "COMPLETED", "CANCELLED", "EXCEPTION"
+];
 
 export default async function PortalCollections({ searchParams }: PageProps) {
   const params = await searchParams;
@@ -22,8 +28,6 @@ export default async function PortalCollections({ searchParams }: PageProps) {
   const skip = (page - 1) * limit;
 
   // Build where clause - ONLY this customer's collections
-  type CollectionStatus = "REQUESTED" | "CONFIRMED" | "ASSIGNED" | "IN_TRANSIT" | "COLLECTED" | "RECEIVED" | "CANCELLED";
-
   const where: {
     customerId: string;
     organizationId: string;
@@ -33,7 +37,7 @@ export default async function PortalCollections({ searchParams }: PageProps) {
     organizationId: ctx.organizationId,
   };
 
-  if (status !== "all" && ["REQUESTED", "CONFIRMED", "ASSIGNED", "IN_TRANSIT", "COLLECTED", "RECEIVED", "CANCELLED"].includes(status)) {
+  if (status !== "all" && validStatuses.includes(status as CollectionStatus)) {
     where.status = status as CollectionStatus;
   }
 
@@ -50,23 +54,26 @@ export default async function PortalCollections({ searchParams }: PageProps) {
   const totalPages = Math.ceil(totalCount / limit);
 
   const statusColors: Record<string, { bg: string; text: string; label: string }> = {
+    DRAFT: { bg: "#f1f5f9", text: "#64748b", label: "Draft" },
     REQUESTED: { bg: "#fef3c7", text: "#b45309", label: "Requested" },
-    CONFIRMED: { bg: "#dbeafe", text: "#1e40af", label: "Confirmed" },
+    APPROVED: { bg: "#dbeafe", text: "#1e40af", label: "Approved" },
+    SCHEDULED: { bg: "#e0e7ff", text: "#4338ca", label: "Scheduled" },
     ASSIGNED: { bg: "#e0e7ff", text: "#4338ca", label: "Assigned" },
-    IN_TRANSIT: { bg: "#fae8ff", text: "#a21caf", label: "In Transit" },
+    IN_TRANSIT: { bg: "#f0fdfa", text: "#0f766e", label: "In Transit" },
     COLLECTED: { bg: "#d1fae5", text: "#065f46", label: "Collected" },
     RECEIVED: { bg: "#dcfce7", text: "#166534", label: "Received" },
+    COMPLETED: { bg: "#dcfce7", text: "#166534", label: "Completed" },
     CANCELLED: { bg: "#fef2f2", text: "#b91c1c", label: "Cancelled" },
+    EXCEPTION: { bg: "#fef2f2", text: "#b91c1c", label: "Exception" },
   };
 
   const statusOptions = [
     { value: "all", label: "All Status" },
     { value: "REQUESTED", label: "Requested" },
-    { value: "CONFIRMED", label: "Confirmed" },
-    { value: "ASSIGNED", label: "Assigned" },
+    { value: "APPROVED", label: "Approved" },
+    { value: "SCHEDULED", label: "Scheduled" },
     { value: "IN_TRANSIT", label: "In Transit" },
-    { value: "COLLECTED", label: "Collected" },
-    { value: "RECEIVED", label: "Received" },
+    { value: "COMPLETED", label: "Completed" },
   ];
 
   return (

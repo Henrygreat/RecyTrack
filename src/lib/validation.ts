@@ -95,13 +95,17 @@ export const collectionSchema = z.object({
 );
 
 export const statusSchema = z.enum([
+  "DRAFT",
   "REQUESTED",
-  "CONFIRMED",
+  "APPROVED",
+  "SCHEDULED",
   "ASSIGNED",
   "IN_TRANSIT",
   "COLLECTED",
   "RECEIVED",
+  "COMPLETED",
   "CANCELLED",
+  "EXCEPTION",
 ]);
 
 // ============================================

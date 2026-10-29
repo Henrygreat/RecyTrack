@@ -9,20 +9,27 @@ import { CollectionStatusBadge, Badge } from "@/components/ui/badge";
 import { MetricCard } from "@/components/ui/metric-card";
 import { EmptyState } from "@/components/ui/empty-state";
 
+// Primary workflow actions (excludes CANCELLED and EXCEPTION branches)
 const nextStatus: Record<string, string | undefined> = {
-  REQUESTED: "CONFIRMED",
-  CONFIRMED: "ASSIGNED",
+  DRAFT: "REQUESTED",
+  REQUESTED: "APPROVED",
+  APPROVED: "SCHEDULED",
+  SCHEDULED: "ASSIGNED",
   ASSIGNED: "IN_TRANSIT",
   IN_TRANSIT: "COLLECTED",
   COLLECTED: "RECEIVED",
+  RECEIVED: "COMPLETED",
 };
 
 const statusLabels: Record<string, string> = {
-  CONFIRMED: "Confirm",
+  REQUESTED: "Submit",
+  APPROVED: "Approve",
+  SCHEDULED: "Schedule",
   ASSIGNED: "Assign",
-  IN_TRANSIT: "Start Transit",
-  COLLECTED: "Mark Collected",
-  RECEIVED: "Mark Received",
+  IN_TRANSIT: "Dispatch",
+  COLLECTED: "Collected",
+  RECEIVED: "Received",
+  COMPLETED: "Complete",
 };
 
 export default async function Collections() {
@@ -49,13 +56,13 @@ export default async function Collections() {
 
   // Calculate metrics
   const pendingCount = statusCounts
-    .filter((s) => ["REQUESTED", "CONFIRMED", "ASSIGNED"].includes(s.status))
+    .filter((s) => ["DRAFT", "REQUESTED", "APPROVED", "SCHEDULED"].includes(s.status))
     .reduce((sum, s) => sum + s._count.status, 0);
   const inProgressCount = statusCounts
-    .filter((s) => ["IN_TRANSIT", "COLLECTED"].includes(s.status))
+    .filter((s) => ["ASSIGNED", "IN_TRANSIT", "COLLECTED", "RECEIVED"].includes(s.status))
     .reduce((sum, s) => sum + s._count.status, 0);
   const completedCount = statusCounts
-    .filter((s) => s.status === "RECEIVED")
+    .filter((s) => s.status === "COMPLETED")
     .reduce((sum, s) => sum + s._count.status, 0);
 
   return (
@@ -141,15 +148,21 @@ export default async function Collections() {
                         Action
                       </th>
                     )}
+                    <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                      <span className="sr-only">View</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {collections.map((collection) => (
                     <tr key={collection.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4">
-                        <span className="font-mono text-sm font-medium text-slate-900">
+                        <Link
+                          href={`/dashboard/collections/${collection.id}`}
+                          className="font-mono text-sm font-medium text-teal-600 hover:text-teal-700 hover:underline transition-colors"
+                        >
                           {collection.reference}
-                        </span>
+                        </Link>
                       </td>
                       <td className="px-6 py-4">
                         <Link
@@ -196,6 +209,15 @@ export default async function Collections() {
                           )}
                         </td>
                       )}
+                      <td className="px-6 py-4 text-right">
+                        <Link
+                          href={`/dashboard/collections/${collection.id}`}
+                          className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-teal-600 transition-colors"
+                        >
+                          View
+                          <ChevronRight className="w-4 h-4" />
+                        </Link>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
