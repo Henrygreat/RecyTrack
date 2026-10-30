@@ -228,6 +228,17 @@ CREATE INDEX IF NOT EXISTS "Asset_organizationId_createdAt_idx"
     ON "Asset"("organizationId", "createdAt");
 
 -- ============================================
+-- ASSET COMPOSITE UNIQUE INDEX (REQUIRED FOR FKs)
+-- ============================================
+
+-- This unique index is required for multi-tenant foreign key references.
+-- AssetNote and AssetStatusChange reference Asset(id, organizationId).
+-- PostgreSQL requires a unique constraint on the referenced columns.
+-- Must be created BEFORE any FK that references Asset(id, organizationId).
+CREATE UNIQUE INDEX IF NOT EXISTS "Asset_id_organizationId_key"
+    ON "Asset"("id", "organizationId");
+
+-- ============================================
 -- ASSET TABLE FOREIGN KEYS
 -- ============================================
 
