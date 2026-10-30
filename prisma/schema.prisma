@@ -564,11 +564,14 @@ model Asset {
   createdByName   String?
 
   // Relations
+  // Note: Composite FKs with optional first column and required organizationId must use
+  // onDelete: Restrict (not SetNull) because PostgreSQL would try to null both columns,
+  // violating the NOT NULL constraint on organizationId.
   organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  collection        Collection?         @relation(fields: [collectionId, organizationId], references: [id, organizationId])
-  customer          Customer?           @relation(fields: [customerId, organizationId], references: [id, organizationId])
-  site              Site?               @relation(fields: [siteId, organizationId], references: [id, organizationId])
-  warehouseLocation WarehouseLocation?  @relation(fields: [warehouseLocationId, organizationId], references: [id, organizationId])
+  collection        Collection?         @relation(fields: [collectionId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  customer          Customer?           @relation(fields: [customerId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  site              Site?               @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  warehouseLocation WarehouseLocation?  @relation(fields: [warehouseLocationId, organizationId], references: [id, organizationId], onDelete: Restrict)
   notes             AssetNote[]
   statusHistory     AssetStatusChange[]
 

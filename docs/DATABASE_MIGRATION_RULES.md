@@ -38,6 +38,17 @@ These rules apply to ALL database migrations for RecyTrack. Violations have caus
    - Indexes (especially unique indexes required by FKs)
    - Foreign keys (only after all referenced unique constraints exist)
 
+10. **Use ON DELETE RESTRICT for composite FKs** - Composite foreign keys where one column (e.g., organizationId) is NOT NULL must use ON DELETE RESTRICT, not ON DELETE SET NULL:
+    ```sql
+    -- WRONG: SET NULL would try to null both columns, violating NOT NULL on organizationId
+    FOREIGN KEY ("customerId", "organizationId") REFERENCES "Customer"("id", "organizationId")
+    ON DELETE SET NULL  -- DANGEROUS!
+
+    -- CORRECT: RESTRICT prevents deletion of referenced record
+    FOREIGN KEY ("customerId", "organizationId") REFERENCES "Customer"("id", "organizationId")
+    ON DELETE RESTRICT  -- SAFE
+    ```
+
 ### Testing Requirements
 
 10. **Test on staging first** - Test migrations against a production-like staging database before deployment.
@@ -105,12 +116,30 @@ These tables are referenced by composite FKs and MUST have `@@unique([id, organi
 
 ---
 
+## Automated Preflight Checks
+
+Run these checks before any deployment:
+
+```bash
+# Static analysis of migration files
+npm run db:check
+
+# SQL-based preflight check on database
+psql -f scripts/migration-preflight-check.sql
+
+# Full local test with Docker
+./scripts/test-migration-locally.sh
+```
+
+---
+
 ## Migration Checklist
 
 ### Pre-Migration
+- [ ] Ran `npm run db:check` (no errors)
+- [ ] Ran `migration-preflight-check.sql` on staging
 - [ ] Reviewed Prisma schema changes
 - [ ] Checked all FK references have matching unique constraints
-- [ ] Created pre-migration validation script
 - [ ] Tested on local database
 - [ ] Tested on staging database (production copy)
 - [ ] Verified backup exists and is restorable

@@ -11,6 +11,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "db:check": "tsx scripts/check-migration-safety.ts",
     "test": "vitest run"
   },
   "dependencies": {

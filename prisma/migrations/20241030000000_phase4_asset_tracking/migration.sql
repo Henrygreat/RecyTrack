@@ -243,25 +243,27 @@ CREATE UNIQUE INDEX IF NOT EXISTS "Asset_id_organizationId_key"
 -- ============================================
 
 -- Add foreign key for customer relationship
+-- IMPORTANT: Using ON DELETE RESTRICT (not SET NULL) because composite FK
+-- with required organizationId cannot be partially nulled.
 ALTER TABLE "Asset"
     ADD CONSTRAINT "Asset_customerId_organizationId_fkey"
     FOREIGN KEY ("customerId", "organizationId")
     REFERENCES "Customer"("id", "organizationId")
-    ON DELETE SET NULL ON UPDATE CASCADE;
+    ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- Add foreign key for site relationship
 ALTER TABLE "Asset"
     ADD CONSTRAINT "Asset_siteId_organizationId_fkey"
     FOREIGN KEY ("siteId", "organizationId")
     REFERENCES "Site"("id", "organizationId")
-    ON DELETE SET NULL ON UPDATE CASCADE;
+    ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- Add foreign key for warehouse location relationship
 ALTER TABLE "Asset"
     ADD CONSTRAINT "Asset_warehouseLocationId_organizationId_fkey"
     FOREIGN KEY ("warehouseLocationId", "organizationId")
     REFERENCES "WarehouseLocation"("id", "organizationId")
-    ON DELETE SET NULL ON UPDATE CASCADE;
+    ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- ============================================
 -- ASSET NOTE TABLE
