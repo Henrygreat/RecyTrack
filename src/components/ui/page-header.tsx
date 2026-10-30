@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
 interface BreadcrumbItem {
   label: string;
@@ -11,11 +12,21 @@ interface PageHeaderProps {
   description?: string;
   breadcrumbs?: BreadcrumbItem[];
   actions?: ReactNode;
+  backHref?: string;
 }
 
-export function PageHeader({ title, description, breadcrumbs, actions }: PageHeaderProps) {
+export function PageHeader({ title, description, breadcrumbs, actions, backHref }: PageHeaderProps) {
   return (
     <div className="mb-8">
+      {backHref && (
+        <Link
+          href={backHref}
+          className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 mb-3 transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </Link>
+      )}
       {breadcrumbs && breadcrumbs.length > 0 && (
         <nav className="flex items-center space-x-2 text-sm text-slate-500 mb-3">
           {breadcrumbs.map((item, index) => (
