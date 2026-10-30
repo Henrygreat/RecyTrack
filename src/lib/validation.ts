@@ -123,6 +123,116 @@ export const searchParamsSchema = z.object({
   sortOrder: z.enum(["asc", "desc"]).optional(),
 });
 
+// ============================================
+// ASSET VALIDATION
+// ============================================
+
+export const assetCategoryEnum = z.enum([
+  "LAPTOP",
+  "DESKTOP",
+  "SERVER",
+  "MONITOR",
+  "MOBILE_PHONE",
+  "TABLET",
+  "PRINTER",
+  "NETWORKING",
+  "STORAGE_DEVICE",
+  "UPS_BATTERY",
+  "PERIPHERAL",
+  "CABLE_ACCESSORY",
+  "OTHER",
+]);
+
+export const physicalConditionEnum = z.enum([
+  "EXCELLENT",
+  "GOOD",
+  "FAIR",
+  "POOR",
+  "DAMAGED",
+  "FOR_PARTS",
+]);
+
+export const functionalConditionEnum = z.enum([
+  "WORKING",
+  "PARTIAL",
+  "NOT_WORKING",
+  "UNTESTED",
+]);
+
+export const dataBearingStatusEnum = z.enum([
+  "NOT_APPLICABLE",
+  "NOT_ASSESSED",
+  "DATA_PRESENT",
+  "WIPED_STANDARD",
+  "WIPED_CERTIFIED",
+  "PHYSICALLY_DESTROYED",
+]);
+
+export const dispositionOutcomeEnum = z.enum([
+  "PENDING",
+  "RESALE",
+  "DONATION",
+  "RECYCLE",
+  "DESTROY",
+  "RETURN",
+]);
+
+export const assetSchema = z.object({
+  // Core fields
+  category: assetCategoryEnum,
+  categoryOther: z.string().max(100).optional().or(z.literal("")),
+  manufacturer: z.string().trim().max(100).optional().or(z.literal("")),
+  model: z.string().trim().max(100).optional().or(z.literal("")),
+  serialNumber: z.string().trim().max(100).optional().or(z.literal("")),
+
+  // Customer/Collection relationship
+  customerId: z.string().optional().or(z.literal("")),
+  siteId: z.string().optional().or(z.literal("")),
+  collectionId: z.string().optional().or(z.literal("")),
+
+  // Customer's asset tag
+  customerAssetTag: z.string().trim().max(50).optional().or(z.literal("")),
+
+  // Condition assessment
+  physicalCondition: physicalConditionEnum.default("FAIR"),
+  functionalCondition: functionalConditionEnum.default("UNTESTED"),
+  conditionNotes: z.string().max(2000).optional().or(z.literal("")),
+
+  // Data handling
+  dataBearingStatus: dataBearingStatusEnum.default("NOT_ASSESSED"),
+  storageType: z.string().max(50).optional().or(z.literal("")),
+  storageCapacity: z.string().max(50).optional().or(z.literal("")),
+
+  // Warehouse location
+  warehouseLocationId: z.string().optional().or(z.literal("")),
+  binLocation: z.string().max(50).optional().or(z.literal("")),
+
+  // Valuation
+  estimatedValue: z.coerce.number().min(0).max(1000000).optional(),
+  weight: z.coerce.number().min(0).max(10000).optional(),
+
+  // Disposition
+  dispositionOutcome: dispositionOutcomeEnum.default("PENDING"),
+  dispositionNotes: z.string().max(2000).optional().or(z.literal("")),
+
+  // Notes
+  internalNotes: z.string().max(4000).optional().or(z.literal("")),
+});
+
+export const assetUpdateSchema = assetSchema.extend({
+  id: z.string().min(1),
+});
+
+// Data wipe recording schema
+export const dataWipeSchema = z.object({
+  assetId: z.string().min(1),
+  dataWipeMethod: z.string().min(1, "Wipe method is required"),
+  dataWipeDate: z.string().optional(),
+  dataWipeCertificate: z.string().max(100).optional().or(z.literal("")),
+  dataWipeOperator: z.string().max(100).optional().or(z.literal("")),
+  newStatus: dataBearingStatusEnum,
+});
+
 // Type exports
 export type CustomerInput = z.infer<typeof customerSchema>;
 export type CustomerUpdateInput = z.infer<typeof customerUpdateSchema>;
@@ -132,3 +242,6 @@ export type ContactInput = z.infer<typeof contactSchema>;
 export type ContactUpdateInput = z.infer<typeof contactUpdateSchema>;
 export type InvitationInput = z.infer<typeof invitationSchema>;
 export type SearchParams = z.infer<typeof searchParamsSchema>;
+export type AssetInput = z.infer<typeof assetSchema>;
+export type AssetUpdateInput = z.infer<typeof assetUpdateSchema>;
+export type DataWipeInput = z.infer<typeof dataWipeSchema>;

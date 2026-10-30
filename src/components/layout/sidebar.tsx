@@ -43,7 +43,7 @@ const navigation: NavGroup[] = [
   {
     label: "Asset Management",
     items: [
-      { label: "Asset Inventory", href: "/dashboard/assets", icon: Box, badge: "Soon" },
+      { label: "Asset Inventory", href: "/dashboard/assets", icon: Box },
       { label: "Warehouse", href: "/dashboard/warehouse", icon: Warehouse, badge: "Soon" },
       { label: "Data Destruction", href: "/dashboard/destruction", icon: Shield, badge: "Soon" },
     ],

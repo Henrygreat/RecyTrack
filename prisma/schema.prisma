@@ -38,7 +38,7 @@ enum CustomerStatus {
 enum CollectionStatus {
   DRAFT
   REQUESTED
-  CONFIRMED   // Legacy status - migrated to APPROVED, kept for backwards compatibility
+  CONFIRMED // Legacy status - migrated to APPROVED, kept for backwards compatibility
   APPROVED
   SCHEDULED
   ASSIGNED
@@ -71,14 +71,69 @@ enum BookingMode {
 }
 
 enum AssetStatus {
-  EXPECTED
-  COLLECTED
-  RECEIVED
-  INSPECTION
-  DATA_ERASURE
-  REUSE
-  RECYCLE
-  RELEASED
+  EXPECTED // Listed on collection manifest, not yet collected
+  COLLECTED // Picked up from customer site
+  RECEIVED // Arrived at warehouse, awaiting inspection
+  INSPECTION // Being inspected and graded
+  DATA_ERASURE // Data destruction in progress
+  PROCESSING // Being prepared for disposition
+  READY // Ready for sale/recycling
+  LISTED // Listed for resale
+  SOLD // Sold to buyer
+  RECYCLED // Sent to recycling partner
+  DESTROYED // Certified destruction complete
+  RETURNED // Returned to customer
+  RELEASED // Released from inventory
+}
+
+enum AssetCategory {
+  LAPTOP
+  DESKTOP
+  SERVER
+  MONITOR
+  MOBILE_PHONE
+  TABLET
+  PRINTER
+  NETWORKING
+  STORAGE_DEVICE
+  UPS_BATTERY
+  PERIPHERAL
+  CABLE_ACCESSORY
+  OTHER
+}
+
+enum PhysicalCondition {
+  EXCELLENT // Like new, no visible wear
+  GOOD // Minor cosmetic wear only
+  FAIR // Moderate wear, fully functional
+  POOR // Heavy wear, may affect function
+  DAMAGED // Physical damage present
+  FOR_PARTS // Not suitable for resale
+}
+
+enum FunctionalCondition {
+  WORKING // Fully operational
+  PARTIAL // Some functions not working
+  NOT_WORKING // Does not power on or function
+  UNTESTED // Not yet tested
+}
+
+enum DataBearingStatus {
+  NOT_APPLICABLE // No data storage capability
+  NOT_ASSESSED // Not yet checked
+  DATA_PRESENT // Contains data, not wiped
+  WIPED_STANDARD // Standard data wipe complete
+  WIPED_CERTIFIED // Certified erasure with certificate
+  PHYSICALLY_DESTROYED // Storage media physically destroyed
+}
+
+enum DispositionOutcome {
+  PENDING // No disposition decision yet
+  RESALE // To be resold
+  DONATION // To be donated
+  RECYCLE // To be recycled
+  DESTROY // To be destroyed
+  RETURN // To be returned to customer
 }
 
 // ============================================
@@ -86,30 +141,33 @@ enum AssetStatus {
 // ============================================
 
 model User {
-  id           String       @id @default(cuid())
-  name         String?
-  email        String       @unique
-  passwordHash String
-  createdAt    DateTime     @default(now())
-  memberships  Membership[]
-  customerAccess CustomerAccess[]
+  id              String               @id @default(cuid())
+  name            String?
+  email           String               @unique
+  passwordHash    String
+  createdAt       DateTime             @default(now())
+  memberships     Membership[]
+  customerAccess  CustomerAccess[]
   invitationsSent CustomerInvitation[] @relation("InvitedBy")
 }
 
 model Organization {
-  id          String           @id @default(cuid())
-  name        String
-  slug        String           @unique
-  createdAt   DateTime         @default(now())
-  memberships Membership[]
-  customers   Customer[]
-  sites       Site[]
-  contacts    CustomerContact[]
-  zones       CollectionZone[]
-  routeDates  RouteDate[]
-  collections Collection[]
-  assets      Asset[]
-  auditLogs   AuditLog[]
+  id                  String               @id @default(cuid())
+  name                String
+  slug                String               @unique
+  createdAt           DateTime             @default(now())
+  memberships         Membership[]
+  customers           Customer[]
+  sites               Site[]
+  contacts            CustomerContact[]
+  zones               CollectionZone[]
+  routeDates          RouteDate[]
+  collections         Collection[]
+  assets              Asset[]
+  assetNotes          AssetNote[]
+  assetStatusChanges  AssetStatusChange[]
+  warehouseLocations  WarehouseLocation[]
+  auditLogs           AuditLog[]
   customerInvitations CustomerInvitation[]
 }
 
@@ -132,28 +190,29 @@ model Membership {
 model Customer {
   id             String         @id @default(cuid())
   organizationId String
-  reference      String         // Unique customer code e.g. CUST-0001
+  reference      String // Unique customer code e.g. CUST-0001
   name           String
   customerType   CustomerType   @default(BUSINESS)
-  companyNumber  String?        // UK Company House number
-  vatNumber      String?        // VAT registration
-  email          String?        // Main email
+  companyNumber  String? // UK Company House number
+  vatNumber      String? // VAT registration
+  email          String? // Main email
   phone          String?
   website        String?
-  address        String?        // Billing address
+  address        String? // Billing address
   postcode       String?
   status         CustomerStatus @default(ACTIVE)
-  notes          String?        // Internal notes
+  notes          String? // Internal notes
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
   // Legacy field - kept for migration compatibility
-  contactName    String?
+  contactName String?
 
-  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   sites          Site[]
   contacts       CustomerContact[]
   collections    Collection[]
+  assets         Asset[]
   customerAccess CustomerAccess[]
   invitations    CustomerInvitation[]
 
@@ -164,31 +223,32 @@ model Customer {
 }
 
 model Site {
-  id                    String          @id @default(cuid())
-  organizationId        String
-  customerId            String
-  reference             String          // Unique site code e.g. SITE-0001
-  name                  String
-  address               String
-  postcode              String
-  contactName           String?
-  contactPhone          String?
-  contactEmail          String?
+  id                     String   @id @default(cuid())
+  organizationId         String
+  customerId             String
+  reference              String // Unique site code e.g. SITE-0001
+  name                   String
+  address                String
+  postcode               String
+  contactName            String?
+  contactPhone           String?
+  contactEmail           String?
   collectionInstructions String?
-  vehicleAccessNotes    String?
-  openingHours          String?
-  isActive              Boolean         @default(true)
-  isDefault             Boolean         @default(false)
-  zoneId                String?
-  createdAt             DateTime        @default(now())
-  updatedAt             DateTime        @updatedAt
+  vehicleAccessNotes     String?
+  openingHours           String?
+  isActive               Boolean  @default(true)
+  isDefault              Boolean  @default(false)
+  zoneId                 String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
-  organization          Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer              Customer        @relation(fields: [customerId, organizationId], references: [id, organizationId], onDelete: Cascade)
-  zone                  CollectionZone? @relation(fields: [zoneId, organizationId], references: [id, organizationId])
-  contacts              CustomerContact[]
-  siteAccess            SiteAccess[]
-  collections           Collection[]
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer          @relation(fields: [customerId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  zone         CollectionZone?   @relation(fields: [zoneId, organizationId], references: [id, organizationId])
+  contacts     CustomerContact[]
+  siteAccess   SiteAccess[]
+  collections  Collection[]
+  assets       Asset[]
 
   @@unique([organizationId, reference])
   @@unique([id, organizationId])
@@ -197,24 +257,24 @@ model Site {
 }
 
 model CustomerContact {
-  id             String       @id @default(cuid())
+  id             String   @id @default(cuid())
   organizationId String
   customerId     String
-  siteId         String?      // Optional - can be customer-level or site-specific
+  siteId         String? // Optional - can be customer-level or site-specific
   name           String
   email          String?
   phone          String?
   jobTitle       String?
-  isPrimary      Boolean      @default(false)
-  isBilling      Boolean      @default(false)
-  isOperational  Boolean      @default(false)
-  isActive       Boolean      @default(true)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  isPrimary      Boolean  @default(false)
+  isBilling      Boolean  @default(false)
+  isOperational  Boolean  @default(false)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer       Customer     @relation(fields: [customerId, organizationId], references: [id, organizationId], onDelete: Cascade)
-  site           Site?        @relation(fields: [siteId, organizationId], references: [id, organizationId])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  site         Site?        @relation(fields: [siteId, organizationId], references: [id, organizationId])
 
   @@unique([id, organizationId])
   @@index([customerId])
@@ -227,17 +287,17 @@ model CustomerContact {
 // ============================================
 
 model CustomerAccess {
-  id             String        @id @default(cuid())
+  id             String       @id @default(cuid())
   userId         String
   customerId     String
   organizationId String
-  role           CustomerRole  @default(CUSTOMER_USER)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  role           CustomerRole @default(CUSTOMER_USER)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  customer       Customer      @relation(fields: [customerId, organizationId], references: [id, organizationId], onDelete: Cascade)
-  siteAccess     SiteAccess[]
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customer   Customer     @relation(fields: [customerId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  siteAccess SiteAccess[]
 
   @@unique([userId, customerId])
   @@index([customerId])
@@ -245,45 +305,45 @@ model CustomerAccess {
 }
 
 model SiteAccess {
-  id               String         @id @default(cuid())
+  id               String   @id @default(cuid())
   customerAccessId String
   siteId           String
   organizationId   String
-  createdAt        DateTime       @default(now())
+  createdAt        DateTime @default(now())
 
-  customerAccess   CustomerAccess @relation(fields: [customerAccessId], references: [id], onDelete: Cascade)
-  site             Site           @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  customerAccess CustomerAccess @relation(fields: [customerAccessId], references: [id], onDelete: Cascade)
+  site           Site           @relation(fields: [siteId, organizationId], references: [id, organizationId], onDelete: Cascade)
 
   @@unique([customerAccessId, siteId])
   @@index([siteId])
 }
 
 model CustomerInvitation {
-  id             String        @id @default(cuid())
-  organizationId String
-  customerId     String
-  siteId         String?       // Optional site-specific access
-  email          String
-  role           CustomerRole  @default(CUSTOMER_USER)
-  token          String        @unique
-  expiresAt      DateTime
-  acceptedAt     DateTime?
-  revokedAt      DateTime?
+  id              String       @id @default(cuid())
+  organizationId  String
+  customerId      String
+  siteId          String? // Optional site-specific access
+  email           String
+  role            CustomerRole @default(CUSTOMER_USER)
+  token           String       @unique
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
   invitedByUserId String
-  createdAt      DateTime      @default(now())
+  createdAt       DateTime     @default(now())
 
   // Email delivery tracking
-  emailSentAt     DateTime?    // When email was sent to provider
-  emailMessageId  String?      // Resend message ID for tracking
-  emailDeliveredAt DateTime?   // When provider confirmed delivery
-  emailFailedAt   DateTime?    // When delivery failed
-  emailFailureReason String?   // Error message from provider
-  lastResendAt    DateTime?    // Last time invitation was resent
-  resendCount     Int          @default(0)
+  emailSentAt        DateTime? // When email was sent to provider
+  emailMessageId     String? // Resend message ID for tracking
+  emailDeliveredAt   DateTime? // When provider confirmed delivery
+  emailFailedAt      DateTime? // When delivery failed
+  emailFailureReason String? // Error message from provider
+  lastResendAt       DateTime? // Last time invitation was resent
+  resendCount        Int       @default(0)
 
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer       Customer      @relation(fields: [customerId, organizationId], references: [id, organizationId], onDelete: Cascade)
-  invitedBy      User          @relation("InvitedBy", fields: [invitedByUserId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  invitedBy    User         @relation("InvitedBy", fields: [invitedByUserId], references: [id])
 
   @@index([token])
   @@index([customerId])
@@ -325,73 +385,73 @@ model RouteDate {
 }
 
 model Collection {
-  id             String           @id @default(cuid())
+  id             String  @id @default(cuid())
   organizationId String
   reference      String
   customerId     String
-  siteId         String?          // Optional link to site
+  siteId         String? // Optional link to site
   routeDateId    String?
 
   // Booking details
-  bookingMode      BookingMode        @default(ALTERNATIVE)
-  collectionType   CollectionType     @default(STANDARD)
-  priority         CollectionPriority @default(NORMAL)
-  requestedDate    DateTime?          @db.Date
-  scheduledDate    DateTime?          @db.Date
-  status           CollectionStatus   @default(DRAFT)
+  bookingMode    BookingMode        @default(ALTERNATIVE)
+  collectionType CollectionType     @default(STANDARD)
+  priority       CollectionPriority @default(NORMAL)
+  requestedDate  DateTime?          @db.Date
+  scheduledDate  DateTime?          @db.Date
+  status         CollectionStatus   @default(DRAFT)
 
   // Location
-  address          String
-  postcode         String
+  address  String
+  postcode String
 
   // Contact
-  contactName      String?
-  contactPhone     String?
-  contactEmail     String?
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
 
   // Equipment
-  equipmentCategories String[]       // e.g. ["Laptops", "Desktops", "Monitors"]
-  itemEstimate     Int              @default(0)
-  actualItemCount  Int?
+  equipmentCategories String[] // e.g. ["Laptops", "Desktops", "Monitors"]
+  itemEstimate        Int      @default(0)
+  actualItemCount     Int?
 
   // Instructions
-  specialHandling    String?        // Special handling requirements
-  customerInstructions String?      // Instructions from customer
-  internalNotes      String?        // Staff-only notes
-  notes              String?        // Legacy field, kept for compatibility
+  specialHandling      String? // Special handling requirements
+  customerInstructions String? // Instructions from customer
+  internalNotes        String? // Staff-only notes
+  notes                String? // Legacy field, kept for compatibility
 
   // Assignment
-  driverId         String?          // Assigned driver user ID
-  driverName       String?          // Driver display name
-  vehicleReg       String?          // Vehicle registration
+  driverId   String? // Assigned driver user ID
+  driverName String? // Driver display name
+  vehicleReg String? // Vehicle registration
 
   // Timestamps
-  approvedAt       DateTime?
-  assignedAt       DateTime?
-  dispatchedAt     DateTime?        // When driver departed
-  collectedAt      DateTime?
-  receivedAt       DateTime?
-  completedAt      DateTime?
-  cancelledAt      DateTime?
+  approvedAt   DateTime?
+  assignedAt   DateTime?
+  dispatchedAt DateTime? // When driver departed
+  collectedAt  DateTime?
+  receivedAt   DateTime?
+  completedAt  DateTime?
+  cancelledAt  DateTime?
 
   // Exception handling
-  exceptionReason  String?
-  exceptionNotes   String?
+  exceptionReason String?
+  exceptionNotes  String?
 
   // Proof of collection
-  signatureName    String?          // Name of person who signed
-  signatureData    String?          // Base64 signature image
-  proofPhotos      String[]         // Array of photo URLs
+  signatureName String? // Name of person who signed
+  signatureData String? // Base64 signature image
+  proofPhotos   String[] // Array of photo URLs
 
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer         Customer         @relation(fields: [customerId, organizationId], references: [id, organizationId])
-  site             Site?            @relation(fields: [siteId, organizationId], references: [id, organizationId])
-  routeDate        RouteDate?       @relation(fields: [routeDateId, organizationId], references: [id, organizationId])
-  assets           Asset[]
-  statusHistory    CollectionStatusChange[]
+  organization  Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer      Customer                 @relation(fields: [customerId, organizationId], references: [id, organizationId])
+  site          Site?                    @relation(fields: [siteId, organizationId], references: [id, organizationId])
+  routeDate     RouteDate?               @relation(fields: [routeDateId, organizationId], references: [id, organizationId])
+  assets        Asset[]
+  statusHistory CollectionStatusChange[]
 
   @@unique([organizationId, reference])
   @@unique([id, organizationId])
@@ -402,39 +462,183 @@ model Collection {
 }
 
 model CollectionStatusChange {
-  id             String           @id @default(cuid())
-  collectionId   String
-  organizationId String
-  fromStatus     CollectionStatus?
-  toStatus       CollectionStatus
+  id              String            @id @default(cuid())
+  collectionId    String
+  organizationId  String
+  fromStatus      CollectionStatus?
+  toStatus        CollectionStatus
   changedByUserId String?
-  changedByName  String?
-  reason         String?
-  notes          String?
-  createdAt      DateTime         @default(now())
+  changedByName   String?
+  reason          String?
+  notes           String?
+  createdAt       DateTime          @default(now())
 
-  collection     Collection       @relation(fields: [collectionId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  collection Collection @relation(fields: [collectionId, organizationId], references: [id, organizationId], onDelete: Cascade)
 
   @@index([collectionId])
   @@index([organizationId, createdAt])
 }
 
+// ============================================
+// ASSET & WAREHOUSE MANAGEMENT (Phase 4)
+// ============================================
+
 model Asset {
-  id             String       @id @default(cuid())
+  id             String @id @default(cuid())
   organizationId String
-  collectionId   String
-  assetTag       String
-  category       String
-  manufacturer   String?
-  model          String?
-  serialNumber   String?
-  status         AssetStatus  @default(EXPECTED)
-  createdAt      DateTime     @default(now())
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  collection     Collection   @relation(fields: [collectionId, organizationId], references: [id, organizationId])
+
+  // Identifiers
+  assetTag         String // RecyTrack internal asset ID e.g. RT-000001
+  qrCode           String? // QR code data (can be same as assetTag or unique)
+  customerAssetTag String? // Customer's own asset tag/barcode
+
+  // Relationships
+  collectionId String? // Collection this asset came from (nullable for manual entry)
+  customerId   String? // Direct customer link (may differ from collection)
+  siteId       String? // Site where asset was collected
+
+  // Classification
+  category      AssetCategory @default(OTHER)
+  categoryOther String? // Description if category is OTHER
+  manufacturer  String?
+  model         String?
+  serialNumber  String?
+
+  // Device specifications (flexible JSON for different device types)
+  specifications Json? // e.g. { processor: "i7", ram: "16GB", storage: "512GB SSD" }
+
+  // Condition assessment
+  physicalCondition   PhysicalCondition   @default(FAIR)
+  functionalCondition FunctionalCondition @default(UNTESTED)
+  conditionNotes      String?
+
+  // Data handling
+  dataBearingStatus   DataBearingStatus @default(NOT_ASSESSED)
+  storageType         String? // e.g. "SSD", "HDD", "NVMe"
+  storageCapacity     String? // e.g. "512GB", "1TB"
+  dataWipeMethod      String? // e.g. "NIST 800-88", "DoD 5220.22-M"
+  dataWipeDate        DateTime?
+  dataWipeCertificate String? // URL or reference to certificate
+  dataWipeOperator    String? // Name of person who performed wipe
+
+  // Photos
+  photos String[] // Array of photo URLs
+
+  // Timestamps
+  collectedAt DateTime? // When collected from customer
+  receivedAt  DateTime? // When received at warehouse
+  inspectedAt DateTime? // When inspection completed
+  processedAt DateTime? // When processing completed
+  releasedAt  DateTime? // When released from inventory
+
+  // Warehouse location
+  warehouseLocationId String?
+  binLocation         String? // Specific bin/shelf location
+
+  // Assignment
+  assignedOperatorId   String? // User ID of assigned warehouse operator
+  assignedOperatorName String? // Display name for quick reference
+
+  // Valuation
+  estimatedValue  Decimal? @db.Decimal(10, 2)
+  actualSalePrice Decimal? @db.Decimal(10, 2)
+  weight          Decimal? @db.Decimal(8, 3) // Weight in kg
+
+  // Disposition
+  dispositionOutcome   DispositionOutcome @default(PENDING)
+  dispositionDate      DateTime?
+  dispositionNotes     String?
+  buyerName            String? // If sold
+  buyerReference       String? // Buyer's PO or reference
+  recyclingPartner     String? // If recycled
+  recyclingCertificate String? // Recycling certificate reference
+
+  // Processing status
+  status AssetStatus @default(EXPECTED)
+
+  // Metadata
+  internalNotes   String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdByUserId String?
+  createdByName   String?
+
+  // Relations
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  collection        Collection?         @relation(fields: [collectionId, organizationId], references: [id, organizationId])
+  customer          Customer?           @relation(fields: [customerId, organizationId], references: [id, organizationId])
+  site              Site?               @relation(fields: [siteId, organizationId], references: [id, organizationId])
+  warehouseLocation WarehouseLocation?  @relation(fields: [warehouseLocationId, organizationId], references: [id, organizationId])
+  notes             AssetNote[]
+  statusHistory     AssetStatusChange[]
 
   @@unique([organizationId, assetTag])
+  @@unique([id, organizationId])
   @@index([organizationId, serialNumber])
+  @@index([organizationId, status])
+  @@index([organizationId, category])
+  @@index([collectionId])
+  @@index([customerId])
+  @@index([warehouseLocationId])
+  @@index([organizationId, createdAt])
+}
+
+model WarehouseLocation {
+  id             String   @id @default(cuid())
+  organizationId String
+  code           String // Location code e.g. "A-01-03" (Aisle A, Row 1, Shelf 3)
+  name           String // Friendly name e.g. "Laptop Storage Bay 1"
+  description    String?
+  locationType   String? // e.g. "Shelf", "Bin", "Pallet", "Cage"
+  capacity       Int? // Maximum items this location can hold
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assets       Asset[]
+
+  @@unique([organizationId, code])
+  @@unique([id, organizationId])
+  @@index([organizationId, isActive])
+}
+
+model AssetNote {
+  id              String   @id @default(cuid())
+  organizationId  String
+  assetId         String
+  noteType        String   @default("general") // general, inspection, processing, customer, etc.
+  content         String
+  attachmentUrl   String? // URL to attached file
+  attachmentName  String? // Original filename
+  createdByUserId String?
+  createdByName   String?
+  createdAt       DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset        Asset        @relation(fields: [assetId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@index([assetId])
+  @@index([organizationId, createdAt])
+}
+
+model AssetStatusChange {
+  id              String       @id @default(cuid())
+  organizationId  String
+  assetId         String
+  fromStatus      AssetStatus?
+  toStatus        AssetStatus
+  changedByUserId String?
+  changedByName   String?
+  reason          String?
+  notes           String?
+  createdAt       DateTime     @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset        Asset        @relation(fields: [assetId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@index([assetId])
+  @@index([organizationId, createdAt])
 }
 
 model AuditLog {
