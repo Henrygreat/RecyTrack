@@ -16,6 +16,9 @@ import {
   ChevronLeft,
   LogOut,
   Box,
+  ClipboardCheck,
+  ShieldAlert,
+  GitBranch,
 } from "lucide-react";
 
 interface NavItem {
@@ -44,7 +47,10 @@ const navigation: NavGroup[] = [
     label: "Asset Management",
     items: [
       { label: "Asset Inventory", href: "/dashboard/assets", icon: Box },
+      { label: "Inspections", href: "/dashboard/inspections", icon: ClipboardCheck },
       { label: "Warehouse", href: "/dashboard/warehouse", icon: Warehouse },
+      { label: "Quarantine", href: "/dashboard/quarantine", icon: ShieldAlert },
+      { label: "Chain of Custody", href: "/dashboard/custody", icon: GitBranch },
       { label: "Data Destruction", href: "/dashboard/destruction", icon: Shield, badge: "Soon" },
     ],
   },

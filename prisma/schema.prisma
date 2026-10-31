@@ -75,6 +75,7 @@ enum AssetStatus {
   COLLECTED // Picked up from customer site
   RECEIVED // Arrived at warehouse, awaiting inspection
   INSPECTION // Being inspected and graded
+  QUARANTINED // In quarantine hold
   DATA_ERASURE // Data destruction in progress
   PROCESSING // Being prepared for disposition
   READY // Ready for sale/recycling
@@ -137,6 +138,89 @@ enum DispositionOutcome {
 }
 
 // ============================================
+// PHASE 4.3 & 4.4 ENUMS
+// ============================================
+
+enum InspectionStatus {
+  DRAFT // Not yet submitted
+  SUBMITTED // Submitted for review
+  APPROVED // Approved by supervisor
+  REJECTED // Rejected, requires revision
+}
+
+enum InspectionType {
+  RECEIVING // Initial receiving inspection
+  PERIODIC // Routine periodic inspection
+  PRE_SALE // Pre-sale quality check
+  RANDOM // Random quality audit
+  QUALITY_CONTROL // QC check
+  CUSTOMER_REQUEST // Customer-requested inspection
+  POST_REPAIR // After repair/refurbishment
+}
+
+enum ConditionGrade {
+  A // Excellent - Like new, minimal wear
+  B // Good - Light wear, fully functional
+  C // Fair - Moderate wear, functional
+  D // Poor - Heavy wear, may have issues
+  F // Faulty - Non-functional or damaged
+}
+
+enum QuarantineReason {
+  DAMAGE // Physical damage requiring assessment
+  DATA_SECURITY // Data security concern
+  INVESTIGATION // Under investigation
+  COMPLIANCE // Compliance hold
+  CUSTOMER_REQUEST // Customer requested hold
+  SUSPECTED_STOLEN // Suspected stolen property
+  HAZARDOUS // Hazardous material concern
+  OTHER // Other reason
+}
+
+enum QuarantineStatus {
+  ACTIVE // Currently in quarantine
+  RELEASED // Released from quarantine
+  DISPOSED // Disposed while in quarantine
+}
+
+enum CustodyEventType {
+  COLLECTION // Collected from customer site
+  VEHICLE_LOADING // Loaded onto vehicle
+  VEHICLE_UNLOADING // Unloaded from vehicle
+  WAREHOUSE_RECEIPT // Received at warehouse
+  INTERNAL_TRANSFER // Moved within warehouse
+  INSPECTION_HANDOVER // Handed to inspector
+  QUARANTINE_TRANSFER // Moved to/from quarantine
+  PROCESSING_HANDOVER // Handed to processor
+  EXTERNAL_DISPATCH // Dispatched externally
+  FINAL_HANDOVER // Final handover (sale/recycle)
+}
+
+enum HandoverStatus {
+  PENDING // Awaiting confirmation
+  CONFIRMED // Handover confirmed
+  REJECTED // Handover rejected
+  CANCELLED // Handover cancelled
+}
+
+enum CustodyExceptionType {
+  MISSING_CUSTODIAN // No custodian assigned
+  UNCONFIRMED_HANDOVER // Handover not confirmed in time
+  UNEXPECTED_LOCATION // Asset found in unexpected location
+  MISSING_RECEIPT // Receipt confirmation missing
+  UNAUTHORIZED_TRANSFER // Unauthorized transfer attempted
+  CUSTODY_DISCREPANCY // Chain of custody discrepancy
+  ASSET_NOT_FOUND // Asset cannot be located
+}
+
+enum CustodyExceptionStatus {
+  OPEN // Exception is open
+  INVESTIGATING // Under investigation
+  RESOLVED // Exception resolved
+  ESCALATED // Escalated to management
+}
+
+// ============================================
 // CORE USER & ORGANIZATION MODELS
 // ============================================
 
@@ -167,8 +251,13 @@ model Organization {
   assetNotes          AssetNote[]
   assetStatusChanges  AssetStatusChange[]
   warehouseLocations  WarehouseLocation[]
-  auditLogs           AuditLog[]
-  customerInvitations CustomerInvitation[]
+  auditLogs            AuditLog[]
+  customerInvitations  CustomerInvitation[]
+  inspectionTemplates  InspectionTemplate[]
+  inspections          Inspection[]
+  assetQuarantines     AssetQuarantine[]
+  custodyEvents        CustodyEvent[]
+  custodyExceptions    CustodyException[]
 }
 
 model Membership {
@@ -510,6 +599,10 @@ model Asset {
   // Condition assessment
   physicalCondition   PhysicalCondition   @default(FAIR)
   functionalCondition FunctionalCondition @default(UNTESTED)
+  conditionGrade      ConditionGrade? // Overall grade (A-F) from inspection
+  conditionGradeNotes String? // Rationale for grade
+  conditionGradedBy   String? // Inspector who assigned grade
+  conditionGradedAt   DateTime? // When grade was assigned
   conditionNotes      String?
 
   // Data handling
@@ -574,6 +667,10 @@ model Asset {
   warehouseLocation WarehouseLocation?  @relation(fields: [warehouseLocationId, organizationId], references: [id, organizationId], onDelete: Restrict)
   notes             AssetNote[]
   statusHistory     AssetStatusChange[]
+  inspections       Inspection[]
+  quarantines       AssetQuarantine[]
+  custodyEvents     CustodyEvent[]
+  custodyExceptions CustodyException[]
 
   @@unique([organizationId, assetTag])
   @@unique([id, organizationId])
@@ -657,4 +754,305 @@ model AuditLog {
 
   @@index([organizationId, createdAt])
   @@index([entityType, entityId])
+}
+
+// ============================================
+// PHASE 4.3: INSPECTION MANAGEMENT
+// ============================================
+
+model InspectionTemplate {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String // Template name e.g. "Laptop Inspection Checklist"
+  description    String?
+  category       AssetCategory // Which asset category this template applies to
+  version        Int      @default(1)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdByUserId String?
+  createdByName   String?
+
+  organization Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  items        InspectionTemplateItem[]
+  inspections  Inspection[]
+
+  @@unique([organizationId, name, version])
+  @@index([organizationId, category, isActive])
+}
+
+model InspectionTemplateItem {
+  id          String  @id @default(cuid())
+  templateId  String
+  question    String // Checklist question text
+  description String? // Additional guidance
+  itemType    String  @default("checkbox") // checkbox, text, select, numeric
+  options     Json? // For select type: array of options
+  isRequired  Boolean @default(false)
+  sortOrder   Int     @default(0)
+
+  template InspectionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId, sortOrder])
+}
+
+model Inspection {
+  id             String           @id @default(cuid())
+  organizationId String
+  reference      String // Inspection reference e.g. INS-000001
+  assetId        String
+  templateId     String?
+  inspectionType InspectionType   @default(RECEIVING)
+  status         InspectionStatus @default(DRAFT)
+
+  // Snapshot of template at time of inspection
+  templateSnapshot Json? // Copy of template items when inspection started
+
+  // Inspector details
+  inspectorUserId String?
+  inspectorName   String?
+  inspectionDate  DateTime @default(now())
+
+  // Asset details at time of inspection (snapshot)
+  assetCategory     AssetCategory?
+  assetManufacturer String?
+  assetModel        String?
+  assetSerialNumber String?
+
+  // Condition assessment results
+  physicalCondition   PhysicalCondition?
+  functionalCondition FunctionalCondition?
+  conditionGrade      ConditionGrade?
+  gradeRationale      String? // Why this grade was assigned
+
+  // Findings
+  findings           String? // Inspection findings text
+  recommendedAction  String? // Recommended next steps
+  inspectorComments  String? // Additional inspector comments
+
+  // Checklist responses
+  checklistResponses Json? // Array of { itemId, response, notes }
+
+  // Photos and attachments
+  photos      String[] // Array of photo URLs
+  attachments Json? // Array of { url, name, type }
+
+  // Review workflow
+  submittedAt      DateTime?
+  reviewedByUserId String?
+  reviewedByName   String?
+  reviewedAt       DateTime?
+  reviewNotes      String?
+  rejectionReason  String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset        Asset               @relation(fields: [assetId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  template     InspectionTemplate? @relation(fields: [templateId], references: [id])
+  revisions    InspectionRevision[]
+
+  @@unique([organizationId, reference])
+  @@unique([id, organizationId])
+  @@index([assetId])
+  @@index([organizationId, status])
+  @@index([organizationId, inspectionDate])
+  @@index([inspectorUserId])
+}
+
+model InspectionRevision {
+  id           String   @id @default(cuid())
+  inspectionId String
+  revisionNum  Int // Revision number (1, 2, 3...)
+  reason       String // Why revision was made
+  changes      Json // What was changed
+  revisedBy    String? // User ID who made revision
+  revisedByName String?
+  createdAt    DateTime @default(now())
+
+  inspection Inspection @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  @@unique([inspectionId, revisionNum])
+  @@index([inspectionId])
+}
+
+// ============================================
+// PHASE 4.3: QUARANTINE MANAGEMENT
+// ============================================
+
+model AssetQuarantine {
+  id             String           @id @default(cuid())
+  organizationId String
+  assetId        String
+  reason         QuarantineReason
+  status         QuarantineStatus @default(ACTIVE)
+
+  // Details
+  description        String? // Detailed reason for quarantine
+  startDate          DateTime @default(now())
+  expectedEndDate    DateTime? // Expected release date
+  actualEndDate      DateTime? // Actual release date
+
+  // Assignment
+  assignedToUserId   String? // Responsible operator
+  assignedToName     String?
+
+  // Location during quarantine
+  quarantineLocationId String? // Warehouse location for quarantine
+  previousLocationId   String? // Where asset was before quarantine
+
+  // Resolution
+  resolutionAction   String? // What action was taken to resolve
+  resolutionNotes    String?
+  resolvedByUserId   String?
+  resolvedByName     String?
+  resolvedAt         DateTime?
+
+  // Approval for release
+  releaseApprovedBy     String? // User ID who approved release
+  releaseApprovedByName String?
+  releaseApprovedAt     DateTime?
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdByUserId String?
+  createdByName   String?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset        Asset        @relation(fields: [assetId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@unique([id, organizationId])
+  @@index([assetId])
+  @@index([organizationId, status])
+  @@index([organizationId, reason])
+  @@index([assignedToUserId])
+}
+
+// ============================================
+// PHASE 4.4: CHAIN OF CUSTODY
+// ============================================
+
+model CustodyEvent {
+  id             String          @id @default(cuid())
+  organizationId String
+  reference      String // Custody event reference e.g. COC-000001
+  assetId        String
+  eventType      CustodyEventType
+  handoverStatus HandoverStatus  @default(PENDING)
+
+  // Custodian details
+  fromCustodianUserId String? // Previous custodian user ID
+  fromCustodianName   String? // Previous custodian name
+  fromCustodianType   String? // e.g. "driver", "warehouse_operator", "customer"
+  toCustodianUserId   String? // New custodian user ID
+  toCustodianName     String? // New custodian name
+  toCustodianType     String?
+
+  // Location details
+  fromLocationId   String? // Source warehouse location ID
+  fromLocationName String? // Source location name or external address
+  toLocationId     String? // Destination warehouse location ID
+  toLocationName   String? // Destination location name or external address
+
+  // Event details
+  eventDate       DateTime @default(now())
+  initiatedByUserId String?
+  initiatedByName   String?
+
+  // Handover confirmation
+  confirmedAt        DateTime?
+  confirmedByUserId  String?
+  confirmedByName    String?
+  confirmationMethod String? // e.g. "signature", "scan", "manual"
+  signatureData      String? // Base64 signature if applicable
+
+  // Rejection details
+  rejectedAt     DateTime?
+  rejectedByUserId String?
+  rejectedByName   String?
+  rejectionReason  String?
+
+  // Notes and evidence
+  notes       String?
+  photos      String[] // Array of photo URLs
+  attachments Json? // Array of { url, name, type }
+
+  // Link to related records
+  collectionId  String? // Related collection if applicable
+  inspectionId  String? // Related inspection if applicable
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset        Asset        @relation(fields: [assetId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@unique([organizationId, reference])
+  @@unique([id, organizationId])
+  @@index([assetId])
+  @@index([organizationId, eventDate])
+  @@index([organizationId, handoverStatus])
+  @@index([fromCustodianUserId])
+  @@index([toCustodianUserId])
+}
+
+model CustodyException {
+  id               String                 @id @default(cuid())
+  organizationId   String
+  reference        String // Exception reference e.g. EXC-000001
+  assetId          String
+  exceptionType    CustodyExceptionType
+  status           CustodyExceptionStatus @default(OPEN)
+
+  // Exception details
+  description      String // Detailed description of the exception
+  detectedAt       DateTime @default(now())
+  detectedByUserId String?
+  detectedByName   String?
+
+  // Related custody event if applicable
+  relatedCustodyEventId String?
+
+  // Expected vs actual
+  expectedValue    String? // What was expected
+  actualValue      String? // What was found
+
+  // Investigation
+  investigationNotes String?
+  investigatedByUserId String?
+  investigatedByName   String?
+
+  // Resolution
+  resolutionNotes    String?
+  resolvedByUserId   String?
+  resolvedByName     String?
+  resolvedAt         DateTime?
+
+  // Escalation
+  escalatedAt        DateTime?
+  escalatedToUserId  String?
+  escalatedToName    String?
+  escalationReason   String?
+
+  // Priority
+  priority           String @default("medium") // low, medium, high, critical
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset        Asset        @relation(fields: [assetId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@unique([organizationId, reference])
+  @@unique([id, organizationId])
+  @@index([assetId])
+  @@index([organizationId, status])
+  @@index([organizationId, exceptionType])
+  @@index([organizationId, priority])
 }

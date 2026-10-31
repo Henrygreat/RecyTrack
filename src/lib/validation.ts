@@ -233,6 +233,175 @@ export const dataWipeSchema = z.object({
   newStatus: dataBearingStatusEnum,
 });
 
+// ============================================
+// INSPECTION VALIDATION
+// ============================================
+
+export const inspectionTypeEnum = z.enum([
+  "RECEIVING",
+  "PERIODIC",
+  "PRE_SALE",
+  "RANDOM",
+  "QUALITY_CONTROL",
+  "CUSTOMER_REQUEST",
+  "POST_REPAIR",
+]);
+
+export const inspectionStatusEnum = z.enum([
+  "DRAFT",
+  "SUBMITTED",
+  "APPROVED",
+  "REJECTED",
+]);
+
+export const conditionGradeEnum = z.enum(["A", "B", "C", "D", "F"]);
+
+export const inspectionSchema = z.object({
+  assetId: z.string().min(1, "Asset is required"),
+  templateId: z.string().optional().or(z.literal("")),
+  inspectionType: inspectionTypeEnum.default("RECEIVING"),
+  physicalCondition: physicalConditionEnum.optional(),
+  functionalCondition: functionalConditionEnum.optional(),
+  conditionGrade: conditionGradeEnum.optional(),
+  gradeRationale: z.string().max(1000).optional().or(z.literal("")),
+  findings: z.string().max(4000).optional().or(z.literal("")),
+  recommendedAction: z.string().max(2000).optional().or(z.literal("")),
+  inspectorComments: z.string().max(2000).optional().or(z.literal("")),
+});
+
+export const inspectionUpdateSchema = inspectionSchema.extend({
+  id: z.string().min(1),
+});
+
+export const inspectionTemplateSchema = z.object({
+  name: z.string().min(1, "Template name is required").max(100),
+  description: z.string().max(500).optional().or(z.literal("")),
+  category: assetCategoryEnum,
+});
+
+export const inspectionTemplateItemSchema = z.object({
+  templateId: z.string().min(1),
+  question: z.string().min(1, "Question is required").max(500),
+  description: z.string().max(500).optional().or(z.literal("")),
+  itemType: z.enum(["checkbox", "text", "select", "numeric"]).default("checkbox"),
+  options: z.string().optional(), // JSON string for select options
+  isRequired: z.coerce.boolean().default(false),
+  sortOrder: z.coerce.number().int().min(0).default(0),
+});
+
+// ============================================
+// QUARANTINE VALIDATION
+// ============================================
+
+export const quarantineReasonEnum = z.enum([
+  "DAMAGE",
+  "DATA_SECURITY",
+  "INVESTIGATION",
+  "COMPLIANCE",
+  "CUSTOMER_REQUEST",
+  "SUSPECTED_STOLEN",
+  "HAZARDOUS",
+  "OTHER",
+]);
+
+export const quarantineStatusEnum = z.enum([
+  "ACTIVE",
+  "RELEASED",
+  "DISPOSED",
+]);
+
+export const quarantineSchema = z.object({
+  assetId: z.string().min(1, "Asset is required"),
+  reason: quarantineReasonEnum,
+  description: z.string().max(2000).optional().or(z.literal("")),
+  expectedEndDate: z.string().optional().or(z.literal("")),
+  quarantineLocationId: z.string().optional().or(z.literal("")),
+});
+
+export const quarantineReleaseSchema = z.object({
+  quarantineId: z.string().min(1),
+  resolutionAction: z.string().min(1, "Resolution action is required").max(500),
+  resolutionNotes: z.string().max(2000).optional().or(z.literal("")),
+});
+
+// ============================================
+// CUSTODY VALIDATION
+// ============================================
+
+export const custodyEventTypeEnum = z.enum([
+  "COLLECTION",
+  "VEHICLE_LOADING",
+  "VEHICLE_UNLOADING",
+  "WAREHOUSE_RECEIPT",
+  "INTERNAL_TRANSFER",
+  "INSPECTION_HANDOVER",
+  "QUARANTINE_TRANSFER",
+  "PROCESSING_HANDOVER",
+  "EXTERNAL_DISPATCH",
+  "FINAL_HANDOVER",
+]);
+
+export const handoverStatusEnum = z.enum([
+  "PENDING",
+  "CONFIRMED",
+  "REJECTED",
+  "CANCELLED",
+]);
+
+export const custodyEventSchema = z.object({
+  assetId: z.string().min(1, "Asset is required"),
+  eventType: custodyEventTypeEnum,
+  toCustodianUserId: z.string().optional().or(z.literal("")),
+  toCustodianName: z.string().max(100).optional().or(z.literal("")),
+  toCustodianType: z.string().max(50).optional().or(z.literal("")),
+  toLocationId: z.string().optional().or(z.literal("")),
+  toLocationName: z.string().max(200).optional().or(z.literal("")),
+  notes: z.string().max(2000).optional().or(z.literal("")),
+});
+
+export const custodyConfirmSchema = z.object({
+  eventId: z.string().min(1),
+  confirmationMethod: z.string().max(50).optional().or(z.literal("")),
+  signatureData: z.string().optional().or(z.literal("")),
+  notes: z.string().max(2000).optional().or(z.literal("")),
+});
+
+export const custodyRejectSchema = z.object({
+  eventId: z.string().min(1),
+  rejectionReason: z.string().min(1, "Rejection reason is required").max(500),
+});
+
+export const custodyExceptionTypeEnum = z.enum([
+  "MISSING_CUSTODIAN",
+  "UNCONFIRMED_HANDOVER",
+  "UNEXPECTED_LOCATION",
+  "MISSING_RECEIPT",
+  "UNAUTHORIZED_TRANSFER",
+  "CUSTODY_DISCREPANCY",
+  "ASSET_NOT_FOUND",
+]);
+
+export const custodyExceptionStatusEnum = z.enum([
+  "OPEN",
+  "INVESTIGATING",
+  "RESOLVED",
+  "ESCALATED",
+]);
+
+export const custodyExceptionSchema = z.object({
+  assetId: z.string().min(1, "Asset is required"),
+  exceptionType: custodyExceptionTypeEnum,
+  description: z.string().min(1, "Description is required").max(2000),
+  expectedValue: z.string().max(500).optional().or(z.literal("")),
+  actualValue: z.string().max(500).optional().or(z.literal("")),
+  priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
+});
+
+export const custodyExceptionResolveSchema = z.object({
+  exceptionId: z.string().min(1),
+  resolutionNotes: z.string().min(1, "Resolution notes required").max(2000),
+});
+
 // Type exports
 export type CustomerInput = z.infer<typeof customerSchema>;
 export type CustomerUpdateInput = z.infer<typeof customerUpdateSchema>;
@@ -245,3 +414,7 @@ export type SearchParams = z.infer<typeof searchParamsSchema>;
 export type AssetInput = z.infer<typeof assetSchema>;
 export type AssetUpdateInput = z.infer<typeof assetUpdateSchema>;
 export type DataWipeInput = z.infer<typeof dataWipeSchema>;
+export type InspectionInput = z.infer<typeof inspectionSchema>;
+export type InspectionUpdateInput = z.infer<typeof inspectionUpdateSchema>;
+export type QuarantineInput = z.infer<typeof quarantineSchema>;
+export type CustodyEventInput = z.infer<typeof custodyEventSchema>;

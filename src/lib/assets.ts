@@ -15,13 +15,15 @@ import type {
 // Asset Status Workflow:
 // EXPECTED → COLLECTED → RECEIVED → INSPECTION → DATA_ERASURE → PROCESSING → READY
 // Then: → LISTED → SOLD / RECYCLED / DESTROYED / RETURNED / RELEASED
+// QUARANTINED can be entered from multiple states and returned to appropriate next state
 export const ASSET_STATUS_TRANSITIONS: Record<AssetStatus, AssetStatus[]> = {
   EXPECTED: ["COLLECTED"],
   COLLECTED: ["RECEIVED"],
-  RECEIVED: ["INSPECTION"],
-  INSPECTION: ["DATA_ERASURE", "PROCESSING"], // Skip data erasure if not data-bearing
-  DATA_ERASURE: ["PROCESSING"],
-  PROCESSING: ["READY"],
+  RECEIVED: ["INSPECTION", "QUARANTINED"],
+  INSPECTION: ["DATA_ERASURE", "PROCESSING", "QUARANTINED"], // Skip data erasure if not data-bearing
+  QUARANTINED: ["RECEIVED", "INSPECTION", "DATA_ERASURE", "PROCESSING", "DESTROYED"], // Return to workflow or destroy
+  DATA_ERASURE: ["PROCESSING", "QUARANTINED"],
+  PROCESSING: ["READY", "QUARANTINED"],
   READY: ["LISTED", "RECYCLED", "DESTROYED", "RETURNED", "RELEASED"],
   LISTED: ["SOLD", "RECYCLED", "RELEASED"],
   SOLD: [],
@@ -40,6 +42,7 @@ export const ASSET_STATUS_LABELS: Record<AssetStatus, string> = {
   COLLECTED: "Collected",
   RECEIVED: "Received",
   INSPECTION: "Inspection",
+  QUARANTINED: "Quarantined",
   DATA_ERASURE: "Data Erasure",
   PROCESSING: "Processing",
   READY: "Ready",
@@ -159,6 +162,13 @@ export function getAvailableAssetTransitions(status: AssetStatus): AssetStatus[]
  */
 export function isTerminalAssetStatus(status: AssetStatus): boolean {
   return ["SOLD", "RECYCLED", "DESTROYED", "RETURNED", "RELEASED"].includes(status);
+}
+
+/**
+ * Check if asset is in quarantine
+ */
+export function isQuarantined(status: AssetStatus): boolean {
+  return status === "QUARANTINED";
 }
 
 /**
