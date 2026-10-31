@@ -221,6 +221,26 @@ enum CustodyExceptionStatus {
 }
 
 // ============================================
+// PHASE 4.5 ENUMS
+// ============================================
+
+enum StocktakeStatus {
+  IN_PROGRESS // Active stocktake session
+  PAUSED // Temporarily paused
+  PENDING_REVIEW // Completed scanning, awaiting review
+  COMPLETED // Fully reconciled and approved
+  CANCELLED // Cancelled before completion
+}
+
+enum StocktakeItemStatus {
+  EXPECTED // Expected at location but not yet scanned
+  FOUND // Scanned and matched expected location
+  MISSING // Expected but not found after session complete
+  UNEXPECTED // Scanned but not expected at this location
+  DISCREPANCY // Location mismatch (found elsewhere)
+}
+
+// ============================================
 // CORE USER & ORGANIZATION MODELS
 // ============================================
 
@@ -258,6 +278,7 @@ model Organization {
   assetQuarantines     AssetQuarantine[]
   custodyEvents        CustodyEvent[]
   custodyExceptions    CustodyException[]
+  stocktakeSessions    StocktakeSession[]
 }
 
 model Membership {
@@ -671,6 +692,7 @@ model Asset {
   quarantines       AssetQuarantine[]
   custodyEvents     CustodyEvent[]
   custodyExceptions CustodyException[]
+  stocktakeItems    StocktakeItem[]
 
   @@unique([organizationId, assetTag])
   @@unique([id, organizationId])
@@ -695,8 +717,9 @@ model WarehouseLocation {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  assets       Asset[]
+  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assets             Asset[]
+  stocktakeSessions  StocktakeSession[]
 
   @@unique([organizationId, code])
   @@unique([id, organizationId])
@@ -1055,4 +1078,100 @@ model CustodyException {
   @@index([organizationId, status])
   @@index([organizationId, exceptionType])
   @@index([organizationId, priority])
+}
+
+// ============================================
+// PHASE 4.5: STOCKTAKE & INVENTORY
+// ============================================
+
+model StocktakeSession {
+  id             String          @id @default(cuid())
+  organizationId String
+  reference      String // Session reference e.g. STK-000001
+  name           String // Descriptive name e.g. "Q4 2024 Full Stocktake"
+  description    String?
+  status         StocktakeStatus @default(IN_PROGRESS)
+
+  // Scope of stocktake
+  warehouseLocationId String? // Specific location or null for full warehouse
+  includeAllLocations Boolean @default(false)
+
+  // Session details
+  startedAt       DateTime @default(now())
+  pausedAt        DateTime?
+  resumedAt       DateTime?
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+
+  // Operator details
+  startedByUserId String?
+  startedByName   String?
+  completedByUserId String?
+  completedByName   String?
+
+  // Summary counts (updated as session progresses)
+  expectedCount   Int @default(0) // Assets expected at start
+  scannedCount    Int @default(0) // Unique assets scanned
+  foundCount      Int @default(0) // Matched expected
+  missingCount    Int @default(0) // Expected but not found
+  unexpectedCount Int @default(0) // Not expected but found
+
+  // Reconciliation
+  reconciliationNotes String?
+  approvedByUserId    String?
+  approvedByName      String?
+  approvedAt          DateTime?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  warehouseLocation WarehouseLocation? @relation(fields: [warehouseLocationId, organizationId], references: [id, organizationId])
+  items             StocktakeItem[]
+
+  @@unique([organizationId, reference])
+  @@unique([id, organizationId])
+  @@index([organizationId, status])
+  @@index([organizationId, startedAt])
+  @@index([warehouseLocationId])
+}
+
+model StocktakeItem {
+  id               String              @id @default(cuid())
+  stocktakeId      String
+  assetId          String
+  status           StocktakeItemStatus @default(EXPECTED)
+
+  // Expected vs actual
+  expectedLocationId   String? // Where asset should be
+  expectedLocationCode String?
+  actualLocationId     String? // Where asset was found
+  actualLocationCode   String?
+
+  // Scan details
+  scannedAt       DateTime?
+  scannedByUserId String?
+  scannedByName   String?
+  scanMethod      String? // "camera", "scanner", "manual"
+
+  // For duplicates/errors
+  scanCount       Int     @default(0) // How many times scanned
+  lastScanAt      DateTime?
+  isDuplicate     Boolean @default(false)
+
+  // Notes
+  notes           String?
+  discrepancyType String? // "location_mismatch", "condition_change", etc.
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stocktake StocktakeSession @relation(fields: [stocktakeId], references: [id], onDelete: Cascade)
+  asset     Asset            @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([stocktakeId, assetId])
+  @@index([stocktakeId, status])
+  @@index([assetId])
 }

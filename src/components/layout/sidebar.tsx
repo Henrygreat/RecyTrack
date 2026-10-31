@@ -19,6 +19,7 @@ import {
   ClipboardCheck,
   ShieldAlert,
   GitBranch,
+  QrCode,
 } from "lucide-react";
 
 interface NavItem {
@@ -47,6 +48,7 @@ const navigation: NavGroup[] = [
     label: "Asset Management",
     items: [
       { label: "Asset Inventory", href: "/dashboard/assets", icon: Box },
+      { label: "Scan Mode", href: "/dashboard/scan", icon: QrCode },
       { label: "Inspections", href: "/dashboard/inspections", icon: ClipboardCheck },
       { label: "Warehouse", href: "/dashboard/warehouse", icon: Warehouse },
       { label: "Quarantine", href: "/dashboard/quarantine", icon: ShieldAlert },
