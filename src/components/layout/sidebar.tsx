@@ -20,6 +20,8 @@ import {
   ShieldAlert,
   GitBranch,
   QrCode,
+  Award,
+  AlertTriangle,
 } from "lucide-react";
 
 interface NavItem {
@@ -54,6 +56,16 @@ const navigation: NavGroup[] = [
       { label: "Quarantine", href: "/dashboard/quarantine", icon: ShieldAlert },
       { label: "Chain of Custody", href: "/dashboard/custody", icon: GitBranch },
       { label: "Data Destruction", href: "/dashboard/destruction", icon: Shield },
+    ],
+  },
+  {
+    label: "Compliance",
+    items: [
+      { label: "Certificates", href: "/dashboard/certificates", icon: Award },
+      { label: "Compliance Centre", href: "/dashboard/compliance", icon: ShieldAlert },
+      { label: "Policies", href: "/dashboard/compliance/policies", icon: FileText },
+      { label: "Exceptions", href: "/dashboard/compliance/exceptions", icon: AlertTriangle },
+      { label: "Audits", href: "/dashboard/compliance/audits", icon: ClipboardCheck },
     ],
   },
   {

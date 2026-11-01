@@ -284,6 +284,12 @@ model Organization {
   erasureMethods      ErasureMethod[]
   erasureJobs         ErasureJob[]
   destructionJobs     DestructionJob[]
+  // Phase 5.3 & 5.4: Certificates & Compliance
+  certificates         Certificate[]
+  compliancePolicies   CompliancePolicy[]
+  complianceExceptions ComplianceException[]
+  complianceAudits     ComplianceAudit[]
+  complianceEvidence   ComplianceEvidence[]
 }
 
 model Membership {
@@ -330,6 +336,7 @@ model Customer {
   assets         Asset[]
   customerAccess CustomerAccess[]
   invitations    CustomerInvitation[]
+  certificates   Certificate[]
 
   @@unique([organizationId, reference])
   @@unique([id, organizationId])
@@ -1393,6 +1400,7 @@ model StorageMedia {
   warehouseLocation WarehouseLocation? @relation(fields: [warehouseLocationId, organizationId], references: [id, organizationId])
   erasureJobs       ErasureJob[]
   destructionJob    DestructionJob?
+  certificateItems  CertificateItem[]
 
   @@unique([organizationId, reference])
   @@unique([id, organizationId])
@@ -1711,4 +1719,586 @@ model DestructionEvidence {
 
   @@index([destructionJobId])
   @@index([evidenceType])
+}
+
+// ============================================
+// PHASE 5.3: CERTIFICATE MANAGEMENT ENUMS
+// ============================================
+
+enum CertificateType {
+  DATA_ERASURE // Certificate of Data Erasure
+  PHYSICAL_DESTRUCTION // Certificate of Physical Data Destruction
+  BATCH // Combined batch certificate with itemised outcomes
+}
+
+enum CertificateStatus {
+  DRAFT // Being prepared
+  PENDING_APPROVAL // Awaiting supervisor approval
+  ISSUED // Officially issued
+  REVOKED // Revoked (with reason)
+  SUPERSEDED // Replaced by newer certificate
+}
+
+// ============================================
+// PHASE 5.4: COMPLIANCE ENUMS
+// ============================================
+
+enum CompliancePolicyStatus {
+  DRAFT // Being drafted
+  PENDING_APPROVAL // Awaiting approval
+  ACTIVE // Currently active
+  ARCHIVED // No longer active
+  SUPERSEDED // Replaced by newer version
+}
+
+enum ComplianceExceptionSeverity {
+  LOW // Minor issue, informational
+  MEDIUM // Moderate issue, needs attention
+  HIGH // Serious issue, requires action
+  CRITICAL // Blocking issue, immediate action required
+}
+
+enum ComplianceExceptionStatus {
+  OPEN // Exception is open
+  INVESTIGATING // Under investigation
+  PENDING_ACTION // Awaiting corrective action
+  RESOLVED // Exception resolved
+  CLOSED // Closed (with or without action)
+  ESCALATED // Escalated to management
+}
+
+enum ComplianceExceptionCategory {
+  ERASURE_FAILURE // Failed or inconclusive erasure
+  MISSING_MEDIA // Storage media unaccounted for
+  SERIAL_MISMATCH // Serial number doesn't match records
+  MISSING_EVIDENCE // Required evidence not provided
+  UNAPPROVED_METHOD // Method not approved for use
+  UNVERIFIED_DESTRUCTION // Destruction not verified
+  OVERDUE_APPROVAL // Supervisor approval overdue
+  CERTIFICATE_ERROR // Incorrect certificate issuance
+  EXPIRED_POLICY // Policy review overdue
+  CUSTODY_DISCREPANCY // Chain of custody issue
+  OTHER // Other compliance issue
+}
+
+enum AuditStatus {
+  PLANNED // Audit scheduled
+  IN_PROGRESS // Audit underway
+  PENDING_REVIEW // Findings being reviewed
+  COMPLETED // Audit completed
+  CANCELLED // Audit cancelled
+}
+
+enum AuditFindingSeverity {
+  OBSERVATION // Minor observation, no action required
+  MINOR // Minor non-conformance
+  MAJOR // Major non-conformance
+  CRITICAL // Critical non-conformance
+}
+
+enum AuditFindingStatus {
+  OPEN // Finding is open
+  CORRECTIVE_ACTION_REQUIRED // Action needed
+  ACTION_IN_PROGRESS // Corrective action underway
+  PENDING_VERIFICATION // Awaiting verification
+  CLOSED // Finding closed
+}
+
+// ============================================
+// PHASE 5.3: CERTIFICATE MODEL
+// ============================================
+
+model Certificate {
+  id             String @id @default(cuid())
+  organizationId String
+
+  // Identification
+  reference              String // Certificate reference e.g. CERT-000001
+  certificateNumber      String // Human-readable certificate number
+  verificationToken      String @unique // Cryptographic token for public verification
+
+  // Type and status
+  certificateType CertificateType
+  status          CertificateStatus @default(DRAFT)
+
+  // Customer (all items belong to same customer)
+  customerId String
+
+  // Issue details
+  issueDate       DateTime?
+  issuedByUserId  String?
+  issuedByName    String?
+
+  // Approval workflow
+  approvedAt       DateTime?
+  approvedByUserId String?
+  approvedByName   String?
+  approvalNotes    String?
+
+  // Processing summary
+  processingStartDate    DateTime? // Earliest processing date
+  processingCompleteDate DateTime? // Latest processing completion date
+  totalMediaCount        Int       @default(0)
+  sanitisationSummary    String? // Brief summary of methods used
+
+  // PDF document
+  pdfUrl           String? // URL to stored PDF
+  pdfGeneratedAt   DateTime?
+  documentChecksum String? // SHA-256 hash of PDF
+  templateVersion  String? // Version of template used
+
+  // Revocation
+  revokedAt       DateTime?
+  revokedByUserId String?
+  revokedByName   String?
+  revocationReason String?
+
+  // Supersession
+  supersededById    String? // Certificate that replaced this one
+  supersededAt      DateTime?
+  supersessionReason String?
+
+  // Metadata
+  notes String?
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdByUserId String?
+  createdByName   String?
+
+  // Relations
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer           @relation(fields: [customerId, organizationId], references: [id, organizationId])
+  items        CertificateItem[]
+  events       CertificateEvent[]
+  verificationLogs CertificateVerificationLog[]
+
+  @@unique([organizationId, reference])
+  @@unique([organizationId, certificateNumber])
+  @@index([customerId])
+  @@index([organizationId, status])
+  @@index([organizationId, certificateType])
+  @@index([verificationToken])
+  @@index([organizationId, issueDate])
+}
+
+// ============================================
+// PHASE 5.3: CERTIFICATE ITEMS (for batch)
+// ============================================
+
+model CertificateItem {
+  id            String @id @default(cuid())
+  certificateId String
+
+  // Media/job reference
+  storageMediaId String
+  erasureJobId   String?
+  destructionJobId String?
+
+  // Snapshot of processing details at certificate creation
+  mediaReference   String // Storage media reference
+  mediaType        String // HDD, SSD, etc.
+  serialNumber     String?
+  assetTag         String // Parent asset tag
+
+  // Processing details
+  processingType   String // "ERASURE" or "DESTRUCTION"
+  processingMethod String // Method name used
+  processingDate   DateTime
+  outcomeStatus    String // PASSED, VERIFIED, etc.
+
+  // Verification details
+  verifiedByName String?
+  verifiedAt     DateTime?
+
+  // Order in certificate
+  sortOrder Int @default(0)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+
+  // Relations
+  certificate  Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+  storageMedia StorageMedia @relation(fields: [storageMediaId], references: [id])
+
+  @@index([certificateId])
+  @@index([storageMediaId])
+}
+
+// ============================================
+// PHASE 5.3: CERTIFICATE EVENTS (audit trail)
+// ============================================
+
+model CertificateEvent {
+  id            String @id @default(cuid())
+  certificateId String
+
+  // Event details
+  eventType    String // CREATED, SUBMITTED, APPROVED, ISSUED, REVOKED, SUPERSEDED, DOWNLOADED, VERIFIED
+  eventDate    DateTime @default(now())
+
+  // Actor
+  actorUserId String?
+  actorName   String?
+  actorIp     String? // For verification events
+
+  // Details
+  details Json? // Additional event-specific details
+  notes   String?
+
+  // Relations
+  certificate Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+
+  @@index([certificateId])
+  @@index([eventType])
+  @@index([eventDate])
+}
+
+// ============================================
+// PHASE 5.3: CERTIFICATE VERIFICATION LOG
+// ============================================
+
+model CertificateVerificationLog {
+  id            String @id @default(cuid())
+  certificateId String
+
+  // Verification details
+  verifiedAt    DateTime @default(now())
+  verifierIp    String?
+  userAgent     String?
+
+  // Result
+  verificationResult String // VALID, REVOKED, SUPERSEDED, NOT_FOUND
+
+  // Relations
+  certificate Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+
+  @@index([certificateId])
+  @@index([verifiedAt])
+}
+
+// ============================================
+// PHASE 5.4: COMPLIANCE POLICY
+// ============================================
+
+model CompliancePolicy {
+  id             String @id @default(cuid())
+  organizationId String
+
+  // Identification
+  reference    String // Policy reference e.g. POL-001
+  title        String
+  description  String?
+
+  // Version control
+  version       Int    @default(1)
+  previousVersionId String? // Link to previous version
+
+  // Status
+  status CompliancePolicyStatus @default(DRAFT)
+
+  // Ownership
+  ownerUserId String?
+  ownerName   String?
+
+  // Dates
+  effectiveDate DateTime?
+  reviewDate    DateTime? // When policy should be reviewed
+  expiryDate    DateTime?
+
+  // Content
+  policyContent String? // Full policy text or reference
+  documentUrl   String? // Link to policy document
+
+  // Approval
+  approvedAt       DateTime?
+  approvedByUserId String?
+  approvedByName   String?
+
+  // Sanitisation procedures this policy approves
+  approvedErasureMethods    String[] // List of approved erasure method codes
+  approvedDestructionMethods String[] // List of approved destruction methods
+
+  // Compliance standards this policy references
+  complianceStandards String[] // e.g. ["UK GDPR", "NIST 800-88"]
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdByUserId String?
+  createdByName   String?
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, reference, version])
+  @@index([organizationId, status])
+  @@index([organizationId, reviewDate])
+}
+
+// ============================================
+// PHASE 5.4: COMPLIANCE EXCEPTION
+// ============================================
+
+model ComplianceException {
+  id             String @id @default(cuid())
+  organizationId String
+
+  // Identification
+  reference   String // Exception reference e.g. CEX-000001
+  title       String
+  description String
+
+  // Classification
+  category ComplianceExceptionCategory
+  severity ComplianceExceptionSeverity @default(MEDIUM)
+  status   ComplianceExceptionStatus   @default(OPEN)
+
+  // Related records
+  assetId          String?
+  storageMediaId   String?
+  erasureJobId     String?
+  destructionJobId String?
+  certificateId    String?
+  customerId       String?
+
+  // Detection
+  detectedAt       DateTime @default(now())
+  detectedByUserId String?
+  detectedByName   String?
+
+  // Assignment
+  assignedToUserId String?
+  assignedToName   String?
+
+  // Investigation
+  investigationNotes   String?
+  investigatedByUserId String?
+  investigatedByName   String?
+
+  // Corrective action
+  correctiveAction      String?
+  correctiveActionDue   DateTime?
+  correctiveActionTaken String?
+  correctiveCompletedAt DateTime?
+
+  // Resolution
+  resolutionNotes  String?
+  resolvedByUserId String?
+  resolvedByName   String?
+  resolvedAt       DateTime?
+
+  // Evidence
+  evidenceUrl String?
+
+  // Escalation
+  escalatedAt       DateTime?
+  escalatedToUserId String?
+  escalatedToName   String?
+  escalationReason  String?
+
+  // Blocking
+  isBlocking Boolean @default(false) // Blocks certificate issuance
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status])
+  @@index([organizationId, severity])
+  @@index([organizationId, category])
+  @@index([assignedToUserId])
+  @@index([storageMediaId])
+  @@index([erasureJobId])
+  @@index([destructionJobId])
+}
+
+// ============================================
+// PHASE 5.4: COMPLIANCE AUDIT
+// ============================================
+
+model ComplianceAudit {
+  id             String @id @default(cuid())
+  organizationId String
+
+  // Identification
+  reference   String // Audit reference e.g. AUD-000001
+  title       String
+  description String?
+  auditType   String? // e.g. "Internal", "External", "Customer", "Regulatory"
+
+  // Scope
+  scope        String? // Description of audit scope
+  customerId   String? // If customer-specific audit
+
+  // Status
+  status AuditStatus @default(PLANNED)
+
+  // Dates
+  plannedStartDate DateTime?
+  actualStartDate  DateTime?
+  plannedEndDate   DateTime?
+  actualEndDate    DateTime?
+
+  // Auditor
+  auditorUserId String?
+  auditorName   String?
+  auditorEmail  String?
+  externalAuditor Boolean @default(false)
+  auditorOrganization String?
+
+  // Findings summary
+  totalFindings    Int @default(0)
+  criticalFindings Int @default(0)
+  majorFindings    Int @default(0)
+  minorFindings    Int @default(0)
+  observations     Int @default(0)
+
+  // Review
+  reviewedByUserId String?
+  reviewedByName   String?
+  reviewedAt       DateTime?
+  reviewNotes      String?
+
+  // Closure
+  closedByUserId String?
+  closedByName   String?
+  closedAt       DateTime?
+  closureNotes   String?
+
+  // Documents
+  reportUrl String? // Link to audit report
+  evidencePackageUrl String? // Link to evidence package
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdByUserId String?
+  createdByName   String?
+
+  // Relations
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  findings     AuditFinding[]
+
+  @@unique([organizationId, reference])
+  @@index([organizationId, status])
+  @@index([auditorUserId])
+  @@index([customerId])
+}
+
+// ============================================
+// PHASE 5.4: AUDIT FINDING
+// ============================================
+
+model AuditFinding {
+  id      String @id @default(cuid())
+  auditId String
+
+  // Identification
+  reference   String // Finding reference within audit e.g. F001
+  title       String
+  description String
+
+  // Classification
+  severity AuditFindingSeverity
+  status   AuditFindingStatus @default(OPEN)
+
+  // Related
+  area       String? // Area of non-conformance
+  requirement String? // Requirement not met
+
+  // Corrective action
+  correctiveActionRequired String?
+  correctiveActionDue      DateTime?
+  correctiveActionTaken    String?
+  actionTakenByUserId      String?
+  actionTakenByName        String?
+  actionTakenAt            DateTime?
+
+  // Verification
+  verifiedByUserId String?
+  verifiedByName   String?
+  verifiedAt       DateTime?
+  verificationNotes String?
+
+  // Closure
+  closedByUserId String?
+  closedByName   String?
+  closedAt       DateTime?
+  closureNotes   String?
+
+  // Evidence
+  evidenceUrl String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  audit ComplianceAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  @@unique([auditId, reference])
+  @@index([auditId])
+  @@index([severity])
+  @@index([status])
+}
+
+// ============================================
+// PHASE 5.4: COMPLIANCE EVIDENCE (reuses existing patterns)
+// ============================================
+
+model ComplianceEvidence {
+  id             String @id @default(cuid())
+  organizationId String
+
+  // Classification
+  category String // e.g. "ERASURE_REPORT", "DESTRUCTION_EVIDENCE", "POLICY", "TRAINING", "AUDIT"
+  title    String
+  description String?
+
+  // Linked records (optional)
+  assetId          String?
+  storageMediaId   String?
+  erasureJobId     String?
+  destructionJobId String?
+  certificateId    String?
+  auditId          String?
+  policyId         String?
+  exceptionId      String?
+
+  // File details
+  fileName     String
+  fileUrl      String
+  fileSize     Int?
+  mimeType     String?
+  fileHash     String? // SHA-256 hash
+  hashAlgorithm String?
+
+  // Access control
+  isRestricted Boolean @default(false)
+  accessLevel  String? // e.g. "INTERNAL", "CUSTOMER", "AUDITOR"
+
+  // Retention
+  retentionYears Int?
+  expiresAt      DateTime?
+
+  // Timestamps
+  uploadedAt       DateTime @default(now())
+  uploadedByUserId String?
+  uploadedByName   String?
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, category])
+  @@index([storageMediaId])
+  @@index([erasureJobId])
+  @@index([destructionJobId])
+  @@index([certificateId])
+  @@index([auditId])
 }
