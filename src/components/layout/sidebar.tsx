@@ -53,7 +53,7 @@ const navigation: NavGroup[] = [
       { label: "Warehouse", href: "/dashboard/warehouse", icon: Warehouse },
       { label: "Quarantine", href: "/dashboard/quarantine", icon: ShieldAlert },
       { label: "Chain of Custody", href: "/dashboard/custody", icon: GitBranch },
-      { label: "Data Destruction", href: "/dashboard/destruction", icon: Shield, badge: "Soon" },
+      { label: "Data Destruction", href: "/dashboard/destruction", icon: Shield },
     ],
   },
   {
