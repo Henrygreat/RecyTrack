@@ -37,7 +37,9 @@
       "Bash(DATABASE_URL=\"postgresql://test:test@localhost:5432/test\" npx prisma generate:*)",
       "Bash(DATABASE_URL=\"postgresql://test:test@localhost:5432/test\" npx tsc:*)",
       "Bash(DATABASE_URL=\"postgresql://test:test@localhost:5432/test\" AUTH_SECRET=\"test-secret-for-build\" npm run build:*)",
-      "Bash(npm run lint)"
+      "Bash(npm run lint)",
+      "Bash(npx prisma format:*)",
+      "Bash(npx next lint:*)"
     ]
   }
 }

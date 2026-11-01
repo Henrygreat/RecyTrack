@@ -60,7 +60,7 @@ const navigation: NavGroup[] = [
     label: "Business",
     items: [
       { label: "Documents", href: "/dashboard/documents", icon: FileText, badge: "Soon" },
-      { label: "Reports", href: "/dashboard/reports", icon: BarChart3, badge: "Soon" },
+      { label: "Reports", href: "/dashboard/reports", icon: BarChart3 },
     ],
   },
   {

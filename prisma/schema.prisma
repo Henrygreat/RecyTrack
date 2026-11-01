@@ -1175,3 +1175,66 @@ model StocktakeItem {
   @@index([stocktakeId, status])
   @@index([assetId])
 }
+
+// ============================================
+// PHASE 4.6: SCAN EVENT TRACKING
+// ============================================
+
+enum ScanEventType {
+  LOOKUP // Asset lookup/search
+  RECEIVE // Receiving scan
+  TRANSFER // Transfer scan
+  INSPECT // Inspection scan
+  STOCKTAKE // Stocktake scan
+  LABEL_PRINT // Label generation
+  STATUS_UPDATE // Status change via scan
+  BULK_OPERATION // Bulk operation
+}
+
+enum ScanOutcome {
+  SUCCESS // Scan completed successfully
+  NOT_FOUND // Asset not found
+  ERROR // Error occurred
+  DUPLICATE // Duplicate scan (ignored)
+  INVALID // Invalid barcode/QR
+}
+
+model ScanEvent {
+  id             String        @id @default(cuid())
+  organizationId String
+
+  // Scan details
+  eventType      ScanEventType
+  outcome        ScanOutcome
+  scannedValue   String // Raw scanned value (barcode/QR)
+
+  // Asset link (if found)
+  assetId        String?
+  assetTag       String?
+
+  // Context
+  scanMethod     String? // "camera", "scanner", "manual"
+  workflowContext String? // Additional context (e.g., stocktake session ID)
+
+  // Operator
+  operatorUserId String?
+  operatorName   String?
+
+  // Location (if applicable)
+  warehouseLocationId String?
+
+  // Error details (if applicable)
+  errorMessage   String?
+
+  // Timestamps
+  scannedAt      DateTime @default(now())
+
+  // Do not store PII or sensitive data
+  // This is operational data only
+
+  @@index([organizationId, scannedAt])
+  @@index([organizationId, eventType])
+  @@index([organizationId, outcome])
+  @@index([assetId])
+  @@index([operatorUserId, scannedAt])
+}
