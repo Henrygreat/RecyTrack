@@ -256,34 +256,34 @@ model User {
 }
 
 model Organization {
-  id                  String               @id @default(cuid())
-  name                String
-  slug                String               @unique
-  createdAt           DateTime             @default(now())
-  memberships         Membership[]
-  customers           Customer[]
-  sites               Site[]
-  contacts            CustomerContact[]
-  zones               CollectionZone[]
-  routeDates          RouteDate[]
-  collections         Collection[]
-  assets              Asset[]
-  assetNotes          AssetNote[]
-  assetStatusChanges  AssetStatusChange[]
-  warehouseLocations  WarehouseLocation[]
-  auditLogs           AuditLog[]
-  customerInvitations CustomerInvitation[]
-  inspectionTemplates InspectionTemplate[]
-  inspections         Inspection[]
-  assetQuarantines    AssetQuarantine[]
-  custodyEvents       CustodyEvent[]
-  custodyExceptions   CustodyException[]
-  stocktakeSessions   StocktakeSession[]
+  id                   String                @id @default(cuid())
+  name                 String
+  slug                 String                @unique
+  createdAt            DateTime              @default(now())
+  memberships          Membership[]
+  customers            Customer[]
+  sites                Site[]
+  contacts             CustomerContact[]
+  zones                CollectionZone[]
+  routeDates           RouteDate[]
+  collections          Collection[]
+  assets               Asset[]
+  assetNotes           AssetNote[]
+  assetStatusChanges   AssetStatusChange[]
+  warehouseLocations   WarehouseLocation[]
+  auditLogs            AuditLog[]
+  customerInvitations  CustomerInvitation[]
+  inspectionTemplates  InspectionTemplate[]
+  inspections          Inspection[]
+  assetQuarantines     AssetQuarantine[]
+  custodyEvents        CustodyEvent[]
+  custodyExceptions    CustodyException[]
+  stocktakeSessions    StocktakeSession[]
   // Phase 5.1 & 5.2: Data Sanitisation
-  storageMedia        StorageMedia[]
-  erasureMethods      ErasureMethod[]
-  erasureJobs         ErasureJob[]
-  destructionJobs     DestructionJob[]
+  storageMedia         StorageMedia[]
+  erasureMethods       ErasureMethod[]
+  erasureJobs          ErasureJob[]
+  destructionJobs      DestructionJob[]
   // Phase 5.3 & 5.4: Certificates & Compliance
   certificates         Certificate[]
   compliancePolicies   CompliancePolicy[]
@@ -1813,9 +1813,9 @@ model Certificate {
   organizationId String
 
   // Identification
-  reference              String // Certificate reference e.g. CERT-000001
-  certificateNumber      String // Human-readable certificate number
-  verificationToken      String @unique // Cryptographic token for public verification
+  reference         String // Certificate reference e.g. CERT-000001
+  certificateNumber String // Human-readable certificate number
+  verificationToken String @unique // Cryptographic token for public verification
 
   // Type and status
   certificateType CertificateType
@@ -1825,9 +1825,9 @@ model Certificate {
   customerId String
 
   // Issue details
-  issueDate       DateTime?
-  issuedByUserId  String?
-  issuedByName    String?
+  issueDate      DateTime?
+  issuedByUserId String?
+  issuedByName   String?
 
   // Approval workflow
   approvedAt       DateTime?
@@ -1848,14 +1848,14 @@ model Certificate {
   templateVersion  String? // Version of template used
 
   // Revocation
-  revokedAt       DateTime?
-  revokedByUserId String?
-  revokedByName   String?
+  revokedAt        DateTime?
+  revokedByUserId  String?
+  revokedByName    String?
   revocationReason String?
 
   // Supersession
-  supersededById    String? // Certificate that replaced this one
-  supersededAt      DateTime?
+  supersededById     String? // Certificate that replaced this one
+  supersededAt       DateTime?
   supersessionReason String?
 
   // Metadata
@@ -1868,10 +1868,10 @@ model Certificate {
   createdByName   String?
 
   // Relations
-  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer     Customer           @relation(fields: [customerId, organizationId], references: [id, organizationId])
-  items        CertificateItem[]
-  events       CertificateEvent[]
+  organization     Organization                 @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer         Customer                     @relation(fields: [customerId, organizationId], references: [id, organizationId])
+  items            CertificateItem[]
+  events           CertificateEvent[]
   verificationLogs CertificateVerificationLog[]
 
   @@unique([organizationId, reference])
@@ -1892,15 +1892,15 @@ model CertificateItem {
   certificateId String
 
   // Media/job reference
-  storageMediaId String
-  erasureJobId   String?
+  storageMediaId   String
+  erasureJobId     String?
   destructionJobId String?
 
   // Snapshot of processing details at certificate creation
-  mediaReference   String // Storage media reference
-  mediaType        String // HDD, SSD, etc.
-  serialNumber     String?
-  assetTag         String // Parent asset tag
+  mediaReference String // Storage media reference
+  mediaType      String // HDD, SSD, etc.
+  serialNumber   String?
+  assetTag       String // Parent asset tag
 
   // Processing details
   processingType   String // "ERASURE" or "DESTRUCTION"
@@ -1919,7 +1919,7 @@ model CertificateItem {
   createdAt DateTime @default(now())
 
   // Relations
-  certificate  Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+  certificate  Certificate  @relation(fields: [certificateId], references: [id], onDelete: Cascade)
   storageMedia StorageMedia @relation(fields: [storageMediaId], references: [id])
 
   @@index([certificateId])
@@ -1935,8 +1935,8 @@ model CertificateEvent {
   certificateId String
 
   // Event details
-  eventType    String // CREATED, SUBMITTED, APPROVED, ISSUED, REVOKED, SUPERSEDED, DOWNLOADED, VERIFIED
-  eventDate    DateTime @default(now())
+  eventType String // CREATED, SUBMITTED, APPROVED, ISSUED, REVOKED, SUPERSEDED, DOWNLOADED, VERIFIED
+  eventDate DateTime @default(now())
 
   // Actor
   actorUserId String?
@@ -1964,9 +1964,9 @@ model CertificateVerificationLog {
   certificateId String
 
   // Verification details
-  verifiedAt    DateTime @default(now())
-  verifierIp    String?
-  userAgent     String?
+  verifiedAt DateTime @default(now())
+  verifierIp String?
+  userAgent  String?
 
   // Result
   verificationResult String // VALID, REVOKED, SUPERSEDED, NOT_FOUND
@@ -1987,12 +1987,12 @@ model CompliancePolicy {
   organizationId String
 
   // Identification
-  reference    String // Policy reference e.g. POL-001
-  title        String
-  description  String?
+  reference   String // Policy reference e.g. POL-001
+  title       String
+  description String?
 
   // Version control
-  version       Int    @default(1)
+  version           Int     @default(1)
   previousVersionId String? // Link to previous version
 
   // Status
@@ -2017,7 +2017,7 @@ model CompliancePolicy {
   approvedByName   String?
 
   // Sanitisation procedures this policy approves
-  approvedErasureMethods    String[] // List of approved erasure method codes
+  approvedErasureMethods     String[] // List of approved erasure method codes
   approvedDestructionMethods String[] // List of approved destruction methods
 
   // Compliance standards this policy references
@@ -2133,8 +2133,8 @@ model ComplianceAudit {
   auditType   String? // e.g. "Internal", "External", "Customer", "Regulatory"
 
   // Scope
-  scope        String? // Description of audit scope
-  customerId   String? // If customer-specific audit
+  scope      String? // Description of audit scope
+  customerId String? // If customer-specific audit
 
   // Status
   status AuditStatus @default(PLANNED)
@@ -2146,10 +2146,10 @@ model ComplianceAudit {
   actualEndDate    DateTime?
 
   // Auditor
-  auditorUserId String?
-  auditorName   String?
-  auditorEmail  String?
-  externalAuditor Boolean @default(false)
+  auditorUserId       String?
+  auditorName         String?
+  auditorEmail        String?
+  externalAuditor     Boolean @default(false)
   auditorOrganization String?
 
   // Findings summary
@@ -2172,7 +2172,7 @@ model ComplianceAudit {
   closureNotes   String?
 
   // Documents
-  reportUrl String? // Link to audit report
+  reportUrl          String? // Link to audit report
   evidencePackageUrl String? // Link to evidence package
 
   // Timestamps
@@ -2206,10 +2206,10 @@ model AuditFinding {
 
   // Classification
   severity AuditFindingSeverity
-  status   AuditFindingStatus @default(OPEN)
+  status   AuditFindingStatus   @default(OPEN)
 
   // Related
-  area       String? // Area of non-conformance
+  area        String? // Area of non-conformance
   requirement String? // Requirement not met
 
   // Corrective action
@@ -2221,9 +2221,9 @@ model AuditFinding {
   actionTakenAt            DateTime?
 
   // Verification
-  verifiedByUserId String?
-  verifiedByName   String?
-  verifiedAt       DateTime?
+  verifiedByUserId  String?
+  verifiedByName    String?
+  verifiedAt        DateTime?
   verificationNotes String?
 
   // Closure
@@ -2257,8 +2257,8 @@ model ComplianceEvidence {
   organizationId String
 
   // Classification
-  category String // e.g. "ERASURE_REPORT", "DESTRUCTION_EVIDENCE", "POLICY", "TRAINING", "AUDIT"
-  title    String
+  category    String // e.g. "ERASURE_REPORT", "DESTRUCTION_EVIDENCE", "POLICY", "TRAINING", "AUDIT"
+  title       String
   description String?
 
   // Linked records (optional)
@@ -2272,11 +2272,11 @@ model ComplianceEvidence {
   exceptionId      String?
 
   // File details
-  fileName     String
-  fileUrl      String
-  fileSize     Int?
-  mimeType     String?
-  fileHash     String? // SHA-256 hash
+  fileName      String
+  fileUrl       String
+  fileSize      Int?
+  mimeType      String?
+  fileHash      String? // SHA-256 hash
   hashAlgorithm String?
 
   // Access control

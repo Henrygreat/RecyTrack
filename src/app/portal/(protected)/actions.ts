@@ -144,8 +144,8 @@ export async function getPortalAssets(filters?: {
   limit?: number;
 }) {
   const ctx = await requireCustomerAccess();
-  const page = filters?.page || 1;
-  const limit = filters?.limit || 25;
+  const page = Math.max(1, filters?.page || 1);
+  const limit = Math.min(100, Math.max(1, filters?.limit || 25)); // Cap at 100 items
   const skip = (page - 1) * limit;
 
   const where: {
@@ -342,8 +342,8 @@ export async function getPortalCollections(filters?: {
   limit?: number;
 }) {
   const ctx = await requireCustomerAccess();
-  const page = filters?.page || 1;
-  const limit = filters?.limit || 25;
+  const page = Math.max(1, filters?.page || 1);
+  const limit = Math.min(100, Math.max(1, filters?.limit || 25)); // Cap at 100 items
   const skip = (page - 1) * limit;
 
   const where: {
@@ -402,8 +402,8 @@ export async function getPortalCertificates(filters?: {
   limit?: number;
 }) {
   const ctx = await requireCustomerAccess();
-  const page = filters?.page || 1;
-  const limit = filters?.limit || 25;
+  const page = Math.max(1, filters?.page || 1);
+  const limit = Math.min(100, Math.max(1, filters?.limit || 25)); // Cap at 100 items
   const skip = (page - 1) * limit;
 
   // Build where clause for certificates - only show issued, revoked, or superseded
