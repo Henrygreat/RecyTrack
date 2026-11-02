@@ -39,7 +39,10 @@
       "Bash(DATABASE_URL=\"postgresql://test:test@localhost:5432/test\" AUTH_SECRET=\"test-secret-for-build\" npm run build:*)",
       "Bash(npm run lint)",
       "Bash(npx prisma format:*)",
-      "Bash(npx next lint:*)"
+      "Bash(npx next lint:*)",
+      "Bash(npx cross-env:*)",
+      "Bash(node --max-old-space-size=8192 node_modules/.bin/next build:*)",
+      "Bash($env:NODE_OPTIONS=\"--max-old-space-size=8192\")"
     ]
   }
 }

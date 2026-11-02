@@ -14,9 +14,12 @@ import {
   FileText,
   AlertTriangle,
   Truck,
+  Plus,
 } from "lucide-react";
 import { createCollection, type CollectionActionState } from "../actions";
 import { EQUIPMENT_CATEGORIES, COLLECTION_TYPE_LABELS, PRIORITY_LABELS } from "@/lib/collections";
+import { Modal } from "@/components/ui/modal";
+import { SiteForm } from "@/app/dashboard/customers/components/site-form";
 import type { Customer, Site, RouteDate, CollectionZone } from "@prisma/client";
 
 interface CollectionFormProps {
@@ -45,6 +48,8 @@ export function CollectionForm({ customers, routes, initialData }: CollectionFor
   const [selectedCustomerId, setSelectedCustomerId] = useState(initialData?.customerId || "");
   const [selectedSiteId, setSelectedSiteId] = useState(initialData?.siteId || "");
   const [useScheduledRoute, setUseScheduledRoute] = useState(true);
+  const [showAddSiteModal, setShowAddSiteModal] = useState(false);
+  const [localSites, setLocalSites] = useState<Site[]>([]);
 
   const [state, formAction, isPending] = useActionState<CollectionActionState, FormData>(
     createCollection,
@@ -57,9 +62,11 @@ export function CollectionForm({ customers, routes, initialData }: CollectionFor
     }
   }, [state.success, state.collectionId, router]);
 
-  // Get selected customer's sites
+  // Get selected customer's sites (combine server data with locally added sites)
   const selectedCustomer = customers.find((c) => c.id === selectedCustomerId);
-  const availableSites = selectedCustomer?.sites || [];
+  const serverSites = selectedCustomer?.sites || [];
+  const customerLocalSites = localSites.filter((s) => s.customerId === selectedCustomerId);
+  const availableSites = [...serverSites, ...customerLocalSites];
 
   // Get selected site details
   const selectedSite = availableSites.find((s) => s.id === selectedSiteId);
@@ -67,6 +74,15 @@ export function CollectionForm({ customers, routes, initialData }: CollectionFor
   // Auto-fill address when site is selected
   const handleSiteChange = (siteId: string) => {
     setSelectedSiteId(siteId);
+  };
+
+  // Handle new site creation success
+  const handleSiteCreated = (newSiteId: string) => {
+    // Refresh the page to get the new site data
+    setShowAddSiteModal(false);
+    router.refresh();
+    // The new site will be available after refresh, auto-select it
+    setSelectedSiteId(newSiteId);
   };
 
   return (
@@ -128,23 +144,63 @@ export function CollectionForm({ customers, routes, initialData }: CollectionFor
 
           <div className="field">
             <label htmlFor="siteId">Site (optional)</label>
-            <select
-              id="siteId"
-              name="siteId"
-              value={selectedSiteId}
-              onChange={(e) => handleSiteChange(e.target.value)}
-              disabled={!selectedCustomerId}
-            >
-              <option value="">No specific site</option>
-              {availableSites.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.reference})
-                </option>
-              ))}
-            </select>
+            <div style={{ display: "flex", gap: "0.5rem" }}>
+              <select
+                id="siteId"
+                name="siteId"
+                value={selectedSiteId}
+                onChange={(e) => handleSiteChange(e.target.value)}
+                disabled={!selectedCustomerId}
+                style={{ flex: 1 }}
+              >
+                <option value="">No specific site</option>
+                {availableSites.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({s.reference})
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setShowAddSiteModal(true)}
+                disabled={!selectedCustomerId}
+                title={selectedCustomerId ? "Add new site" : "Select a customer first"}
+                style={{
+                  padding: "0.5rem 0.75rem",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.25rem",
+                }}
+              >
+                <Plus className="w-4 h-4" />
+                <span style={{ fontSize: "0.875rem" }}>Add Site</span>
+              </button>
+            </div>
+            {selectedSite && (
+              <p style={{ fontSize: "0.75rem", color: "#64748b", marginTop: "0.25rem" }}>
+                Address and contact will be auto-filled from site. You can override below.
+              </p>
+            )}
           </div>
         </div>
       </fieldset>
+
+      {/* Add Site Modal */}
+      <Modal
+        isOpen={showAddSiteModal}
+        onClose={() => setShowAddSiteModal(false)}
+        title="Add New Site"
+        description={selectedCustomer ? `Create a new collection site for ${selectedCustomer.name}` : ""}
+        size="lg"
+      >
+        {selectedCustomerId && (
+          <SiteForm
+            customerId={selectedCustomerId}
+            onSuccess={handleSiteCreated}
+          />
+        )}
+      </Modal>
 
       {/* Collection Details */}
       <fieldset style={{ border: "none", padding: 0, margin: "0 0 1.5rem 0" }}>
