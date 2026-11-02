@@ -10,6 +10,10 @@ import {
   Building,
   Menu,
   X,
+  Package,
+  Award,
+  FileText,
+  Users,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -21,10 +25,20 @@ interface PortalShellProps {
   onSignOut: () => Promise<void>;
 }
 
-const navItems = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  adminOnly?: boolean;
+};
+
+const navItems: NavItem[] = [
   { href: "/portal/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/portal/assets", label: "Assets", icon: Package },
+  { href: "/portal/certificates", label: "Certificates", icon: Award },
   { href: "/portal/collections", label: "Collections", icon: Truck },
-  { href: "/portal/sites", label: "Sites", icon: MapPin },
+  { href: "/portal/reports", label: "Reports", icon: FileText },
+  { href: "/portal/users", label: "Users", icon: Users, adminOnly: true },
 ];
 
 export function PortalShell({
@@ -109,31 +123,33 @@ export function PortalShell({
           }}
           className="desktop-nav"
         >
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.5rem",
-                  padding: "0.5rem 1rem",
-                  borderRadius: "0.375rem",
-                  backgroundColor: isActive ? "rgba(255,255,255,0.2)" : "transparent",
-                  color: "white",
-                  textDecoration: "none",
-                  fontSize: "0.875rem",
-                  fontWeight: isActive ? "500" : "400",
-                }}
-              >
-                <Icon className="w-4 h-4" />
-                {item.label}
-              </Link>
-            );
-          })}
+          {navItems
+            .filter((item) => !item.adminOnly || isAdmin)
+            .map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.5rem",
+                    padding: "0.5rem 1rem",
+                    borderRadius: "0.375rem",
+                    backgroundColor: isActive ? "rgba(255,255,255,0.2)" : "transparent",
+                    color: "white",
+                    textDecoration: "none",
+                    fontSize: "0.875rem",
+                    fontWeight: isActive ? "500" : "400",
+                  }}
+                >
+                  <Icon className="w-4 h-4" />
+                  {item.label}
+                </Link>
+              );
+            })}
         </nav>
 
         {/* User menu */}
@@ -176,31 +192,33 @@ export function PortalShell({
           }}
           className="mobile-nav"
         >
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setMobileMenuOpen(false)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "0.75rem",
-                  padding: "0.75rem 1rem",
-                  borderRadius: "0.375rem",
-                  backgroundColor: isActive ? "rgba(255,255,255,0.2)" : "transparent",
-                  color: "white",
-                  textDecoration: "none",
-                  fontSize: "0.875rem",
-                }}
-              >
-                <Icon className="w-5 h-5" />
-                {item.label}
-              </Link>
-            );
-          })}
+          {navItems
+            .filter((item) => !item.adminOnly || isAdmin)
+            .map((item) => {
+              const Icon = item.icon;
+              const isActive = pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.75rem",
+                    padding: "0.75rem 1rem",
+                    borderRadius: "0.375rem",
+                    backgroundColor: isActive ? "rgba(255,255,255,0.2)" : "transparent",
+                    color: "white",
+                    textDecoration: "none",
+                    fontSize: "0.875rem",
+                  }}
+                >
+                  <Icon className="w-5 h-5" />
+                  {item.label}
+                </Link>
+              );
+            })}
         </nav>
       )}
 

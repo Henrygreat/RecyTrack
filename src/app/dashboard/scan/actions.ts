@@ -746,3 +746,636 @@ async function generateCustodyReference(
   const nextNum = parseInt(match[1], 10) + 1;
   return `COC-${nextNum.toString().padStart(6, "0")}`;
 }
+
+// ============================================
+// SMART SCAN - ASSET WITH MEDIA LOOKUP
+// ============================================
+
+export interface AssetMediaLookupResult {
+  found: boolean;
+  asset?: {
+    id: string;
+    assetTag: string;
+    category: string;
+    manufacturer: string | null;
+    model: string | null;
+    serialNumber: string | null;
+    status: AssetStatus;
+    customerName: string | null;
+    customerId: string | null;
+  };
+  storageMedia?: Array<{
+    id: string;
+    reference: string;
+    mediaType: string;
+    capacity: string | null;
+    serialNumber: string | null;
+    sanitisationStatus: string;
+    hasErasureJob: boolean;
+    hasDestructionJob: boolean;
+  }>;
+  certificates?: Array<{
+    id: string;
+    certificateNumber: string;
+    certificateType: string;
+    status: string;
+    issueDate: Date | null;
+  }>;
+  error?: string;
+}
+
+export async function lookupAssetWithMedia(scannedValue: string): Promise<AssetMediaLookupResult> {
+  try {
+    const { organizationId } = await requireMember(undefined, STAFF_ROLES);
+
+    const assetTag = extractAssetTag(scannedValue);
+    if (!assetTag) {
+      return { found: false, error: "Invalid scan value" };
+    }
+
+    // Try to find by asset tag, serial number, or customer asset tag
+    let asset = await prisma.asset.findFirst({
+      where: {
+        organizationId,
+        OR: [
+          { assetTag: { equals: assetTag, mode: "insensitive" } },
+          { serialNumber: { equals: assetTag, mode: "insensitive" } },
+          { customerAssetTag: { equals: assetTag, mode: "insensitive" } },
+        ],
+      },
+      include: {
+        customer: { select: { id: true, name: true } },
+        storageMedia: {
+          select: {
+            id: true,
+            reference: true,
+            mediaType: true,
+            capacity: true,
+            serialNumber: true,
+            sanitisationStatus: true,
+            erasureJobs: { select: { id: true }, take: 1 },
+            destructionJob: { select: { id: true } },
+          },
+        },
+      },
+    });
+
+    if (!asset) {
+      return { found: false, error: `Asset not found: ${assetTag}` };
+    }
+
+    // Get certificates for this asset's media
+    const certificates = await prisma.certificate.findMany({
+      where: {
+        organizationId,
+        status: "ISSUED",
+        items: {
+          some: {
+            storageMedia: {
+              assetId: asset.id,
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        certificateNumber: true,
+        certificateType: true,
+        status: true,
+        issueDate: true,
+      },
+      orderBy: { issueDate: "desc" },
+      take: 5,
+    });
+
+    return {
+      found: true,
+      asset: {
+        id: asset.id,
+        assetTag: asset.assetTag,
+        category: asset.category,
+        manufacturer: asset.manufacturer,
+        model: asset.model,
+        serialNumber: asset.serialNumber,
+        status: asset.status,
+        customerName: asset.customer?.name ?? null,
+        customerId: asset.customer?.id ?? null,
+      },
+      storageMedia: asset.storageMedia.map((m) => ({
+        id: m.id,
+        reference: m.reference,
+        mediaType: m.mediaType,
+        capacity: m.capacity,
+        serialNumber: m.serialNumber,
+        sanitisationStatus: m.sanitisationStatus,
+        hasErasureJob: m.erasureJobs.length > 0,
+        hasDestructionJob: m.destructionJob !== null,
+      })),
+      certificates,
+    };
+  } catch (error) {
+    console.error("Asset with media lookup error:", error);
+    return { found: false, error: "Failed to lookup asset" };
+  }
+}
+
+// ============================================
+// SMART SCAN - MEDIA LOOKUP
+// ============================================
+
+export interface MediaLookupResult {
+  found: boolean;
+  media?: {
+    id: string;
+    reference: string;
+    mediaType: string;
+    capacity: string | null;
+    serialNumber: string | null;
+    sanitisationStatus: string;
+    assetTag: string | null;
+    assetId: string | null;
+    customerName: string | null;
+    hasErasureJob: boolean;
+    hasDestructionJob: boolean;
+  };
+  error?: string;
+}
+
+export async function lookupMediaByReference(scannedValue: string): Promise<MediaLookupResult> {
+  try {
+    const { organizationId } = await requireMember(undefined, STAFF_ROLES);
+
+    const media = await prisma.storageMedia.findFirst({
+      where: {
+        organizationId,
+        OR: [
+          { reference: { equals: scannedValue, mode: "insensitive" } },
+          { serialNumber: { equals: scannedValue, mode: "insensitive" } },
+        ],
+      },
+      include: {
+        asset: {
+          select: {
+            id: true,
+            assetTag: true,
+            customer: { select: { name: true } },
+          },
+        },
+        erasureJobs: { select: { id: true }, take: 1 },
+        destructionJob: { select: { id: true } },
+      },
+    });
+
+    if (!media) {
+      return { found: false, error: `Media not found: ${scannedValue}` };
+    }
+
+    return {
+      found: true,
+      media: {
+        id: media.id,
+        reference: media.reference,
+        mediaType: media.mediaType,
+        capacity: media.capacity,
+        serialNumber: media.serialNumber,
+        sanitisationStatus: media.sanitisationStatus,
+        assetTag: media.asset?.assetTag ?? null,
+        assetId: media.asset?.id ?? null,
+        customerName: media.asset?.customer?.name ?? null,
+        hasErasureJob: media.erasureJobs.length > 0,
+        hasDestructionJob: media.destructionJob !== null,
+      },
+    };
+  } catch (error) {
+    console.error("Media lookup error:", error);
+    return { found: false, error: "Failed to lookup media" };
+  }
+}
+
+// ============================================
+// SMART SCAN - QUEUE FOR ERASURE
+// ============================================
+
+export async function queueMediaForErasure(
+  mediaIds: string[],
+  erasureMethod?: string
+): Promise<{ success: boolean; queued: number; error?: string }> {
+  try {
+    const { organizationId, userId } = await requireMember(undefined, STAFF_ROLES);
+
+    // Verify all media exist and are in valid state
+    const media = await prisma.storageMedia.findMany({
+      where: {
+        id: { in: mediaIds },
+        organizationId,
+        sanitisationStatus: { in: ["NOT_STARTED", "PENDING_ERASURE", "ERASURE_FAILED"] },
+      },
+    });
+
+    if (media.length === 0) {
+      return { success: false, queued: 0, error: "No eligible media found for erasure" };
+    }
+
+    // Update media status
+    await prisma.$transaction(async (tx) => {
+      await tx.storageMedia.updateMany({
+        where: { id: { in: media.map((m) => m.id) } },
+        data: {
+          sanitisationStatus: "ERASURE_IN_PROGRESS",
+          sanitisationMethod: erasureMethod || null,
+          updatedAt: new Date(),
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          organizationId,
+          actorUserId: userId,
+          action: "MEDIA_QUEUED_ERASURE",
+          entityType: "StorageMedia",
+          entityId: "bulk",
+          details: {
+            mediaCount: media.length,
+            mediaIds: media.map((m) => m.id),
+            method: erasureMethod || "default",
+          },
+        },
+      });
+    });
+
+    revalidatePath("/dashboard/scan");
+    revalidatePath("/dashboard/erasure");
+
+    return { success: true, queued: media.length };
+  } catch (error) {
+    console.error("Queue for erasure error:", error);
+    return { success: false, queued: 0, error: "Failed to queue media for erasure" };
+  }
+}
+
+// ============================================
+// SMART SCAN - RECORD ERASURE RESULT
+// ============================================
+
+export async function recordErasureResult(
+  mediaId: string,
+  result: {
+    success: boolean;
+    method: string;
+    startTime: Date;
+    endTime: Date;
+    passes?: number;
+    verificationMethod?: string;
+    errorMessage?: string;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { organizationId, userId } = await requireMember(undefined, STAFF_ROLES);
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, email: true },
+    });
+
+    const media = await prisma.storageMedia.findFirst({
+      where: { id: mediaId, organizationId },
+    });
+
+    if (!media) {
+      return { success: false, error: "Media not found" };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.storageMedia.update({
+        where: { id: mediaId },
+        data: {
+          sanitisationStatus: result.success ? "ERASURE_PASSED" : "ERASURE_FAILED",
+          sanitisationMethod: result.method,
+          verifiedAt: result.success && result.verificationMethod ? new Date() : null,
+          verifiedByUserId: result.success ? userId : null,
+          verifiedByName: result.success ? (user?.name || user?.email) : null,
+          notes: result.errorMessage || null,
+          updatedAt: new Date(),
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          organizationId,
+          actorUserId: userId,
+          action: result.success ? "MEDIA_ERASURE_COMPLETE" : "MEDIA_ERASURE_FAILED",
+          entityType: "StorageMedia",
+          entityId: mediaId,
+          details: {
+            method: result.method,
+            duration: Math.round((result.endTime.getTime() - result.startTime.getTime()) / 1000),
+            passes: result.passes,
+            verificationMethod: result.verificationMethod,
+            errorMessage: result.errorMessage,
+          },
+        },
+      });
+    });
+
+    revalidatePath("/dashboard/scan");
+    revalidatePath("/dashboard/erasure");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Record erasure result error:", error);
+    return { success: false, error: "Failed to record erasure result" };
+  }
+}
+
+// ============================================
+// SMART SCAN - QUEUE FOR DESTRUCTION
+// ============================================
+
+export async function queueMediaForDestruction(
+  mediaIds: string[],
+  destructionMethod?: string
+): Promise<{ success: boolean; queued: number; error?: string }> {
+  try {
+    const { organizationId, userId } = await requireMember(undefined, STAFF_ROLES);
+
+    // Verify all media exist and are in valid state for destruction
+    const media = await prisma.storageMedia.findMany({
+      where: {
+        id: { in: mediaIds },
+        organizationId,
+        destructionJob: null,
+        // Can destroy if sanitised, failed, or not started
+        sanitisationStatus: { in: ["VERIFIED", "ERASURE_PASSED", "ERASURE_FAILED", "NOT_STARTED", "PENDING_ERASURE"] },
+      },
+    });
+
+    if (media.length === 0) {
+      return { success: false, queued: 0, error: "No eligible media found for destruction" };
+    }
+
+    // Update media status
+    await prisma.$transaction(async (tx) => {
+      await tx.storageMedia.updateMany({
+        where: { id: { in: media.map((m) => m.id) } },
+        data: {
+          sanitisationStatus: "PENDING_DESTRUCTION",
+          sanitisationMethod: destructionMethod || "PHYSICAL_DESTRUCTION",
+          updatedAt: new Date(),
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          organizationId,
+          actorUserId: userId,
+          action: "MEDIA_QUEUED_DESTRUCTION",
+          entityType: "StorageMedia",
+          entityId: "bulk",
+          details: {
+            mediaCount: media.length,
+            mediaIds: media.map((m) => m.id),
+            method: destructionMethod || "PHYSICAL_DESTRUCTION",
+          },
+        },
+      });
+    });
+
+    revalidatePath("/dashboard/scan");
+    revalidatePath("/dashboard/destruction");
+
+    return { success: true, queued: media.length };
+  } catch (error) {
+    console.error("Queue for destruction error:", error);
+    return { success: false, queued: 0, error: "Failed to queue media for destruction" };
+  }
+}
+
+// ============================================
+// SMART SCAN - RECORD DESTRUCTION RESULT
+// ============================================
+
+export async function recordDestructionResult(
+  mediaId: string,
+  result: {
+    success: boolean;
+    method: string;
+    destructionDate: Date;
+    evidenceType?: string;
+    evidenceNotes?: string;
+    errorMessage?: string;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { organizationId, userId } = await requireMember(undefined, STAFF_ROLES);
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, email: true },
+    });
+
+    const media = await prisma.storageMedia.findFirst({
+      where: { id: mediaId, organizationId },
+    });
+
+    if (!media) {
+      return { success: false, error: "Media not found" };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.storageMedia.update({
+        where: { id: mediaId },
+        data: {
+          sanitisationStatus: result.success ? "DESTROYED" : "PENDING_DESTRUCTION",
+          sanitisationMethod: result.method,
+          verifiedAt: result.success ? new Date() : null,
+          verifiedByUserId: result.success ? userId : null,
+          verifiedByName: result.success ? (user?.name || user?.email) : null,
+          notes: result.errorMessage || result.evidenceNotes || null,
+          updatedAt: new Date(),
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          organizationId,
+          actorUserId: userId,
+          action: result.success ? "MEDIA_DESTRUCTION_COMPLETE" : "MEDIA_DESTRUCTION_FAILED",
+          entityType: "StorageMedia",
+          entityId: mediaId,
+          details: {
+            method: result.method,
+            destructionDate: result.destructionDate.toISOString(),
+            evidenceType: result.evidenceType,
+            evidenceNotes: result.evidenceNotes,
+            errorMessage: result.errorMessage,
+          },
+        },
+      });
+    });
+
+    revalidatePath("/dashboard/scan");
+    revalidatePath("/dashboard/destruction");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Record destruction result error:", error);
+    return { success: false, error: "Failed to record destruction result" };
+  }
+}
+
+// ============================================
+// SMART SCAN - CERTIFICATE LOOKUP
+// ============================================
+
+export interface CertificateLookupResult {
+  found: boolean;
+  certificate?: {
+    id: string;
+    certificateNumber: string;
+    certificateType: string;
+    status: string;
+    issueDate: Date | null;
+    customerName: string | null;
+    totalMediaCount: number;
+    verificationToken: string | null;
+  };
+  items?: Array<{
+    id: string;
+    mediaReference: string | null;
+    assetTag: string | null;
+    mediaType: string | null;
+    processingMethod: string | null;
+    outcomeStatus: string | null;
+  }>;
+  error?: string;
+}
+
+export async function lookupCertificateByNumber(
+  scannedValue: string
+): Promise<CertificateLookupResult> {
+  try {
+    const { organizationId } = await requireMember(undefined, STAFF_ROLES);
+
+    // Extract certificate number or token
+    const searchValue = scannedValue.trim();
+
+    const certificate = await prisma.certificate.findFirst({
+      where: {
+        organizationId,
+        OR: [
+          { certificateNumber: { equals: searchValue, mode: "insensitive" } },
+          { verificationToken: searchValue },
+          { reference: { equals: searchValue, mode: "insensitive" } },
+        ],
+      },
+      include: {
+        customer: { select: { name: true } },
+        items: {
+          select: {
+            id: true,
+            mediaReference: true,
+            assetTag: true,
+            mediaType: true,
+            processingMethod: true,
+            outcomeStatus: true,
+          },
+          take: 10,
+        },
+      },
+    });
+
+    if (!certificate) {
+      return { found: false, error: `Certificate not found: ${searchValue}` };
+    }
+
+    return {
+      found: true,
+      certificate: {
+        id: certificate.id,
+        certificateNumber: certificate.certificateNumber,
+        certificateType: certificate.certificateType,
+        status: certificate.status,
+        issueDate: certificate.issueDate,
+        customerName: certificate.customer?.name ?? null,
+        totalMediaCount: certificate.totalMediaCount,
+        verificationToken: certificate.verificationToken,
+      },
+      items: certificate.items,
+    };
+  } catch (error) {
+    console.error("Certificate lookup error:", error);
+    return { found: false, error: "Failed to lookup certificate" };
+  }
+}
+
+// ============================================
+// SMART SCAN - VERIFY MEDIA SANITISATION
+// ============================================
+
+export async function verifyMediaSanitisation(
+  mediaId: string,
+  verificationDetails: {
+    method: string;
+    passed: boolean;
+    notes?: string;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { organizationId, userId } = await requireMember(undefined, STAFF_ROLES);
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, email: true },
+    });
+
+    const media = await prisma.storageMedia.findFirst({
+      where: { id: mediaId, organizationId },
+    });
+
+    if (!media) {
+      return { success: false, error: "Media not found" };
+    }
+
+    // Check if media has completed erasure (can verify ERASURE_PASSED or DESTROYED)
+    if (media.sanitisationStatus !== "ERASURE_PASSED" && media.sanitisationStatus !== "DESTROYED") {
+      return { success: false, error: "Media has not completed sanitisation" };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.storageMedia.update({
+        where: { id: mediaId },
+        data: {
+          sanitisationStatus: verificationDetails.passed ? "VERIFIED" : "ERASURE_FAILED",
+          verifiedAt: new Date(),
+          verifiedByUserId: userId,
+          verifiedByName: user?.name || user?.email,
+          notes: verificationDetails.notes || null,
+          updatedAt: new Date(),
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          organizationId,
+          actorUserId: userId,
+          action: verificationDetails.passed ? "MEDIA_VERIFICATION_PASSED" : "MEDIA_VERIFICATION_FAILED",
+          entityType: "StorageMedia",
+          entityId: mediaId,
+          details: {
+            method: verificationDetails.method,
+            passed: verificationDetails.passed,
+            notes: verificationDetails.notes,
+          },
+        },
+      });
+    });
+
+    revalidatePath("/dashboard/scan");
+    revalidatePath("/dashboard/erasure");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Verify media sanitisation error:", error);
+    return { success: false, error: "Failed to verify media" };
+  }
+}
