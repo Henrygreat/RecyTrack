@@ -10,6 +10,8 @@ import {
   getAssetStatusTimestampField,
 } from "@/lib/assets";
 import { revalidatePath } from "next/cache";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
+import { Prisma } from "@prisma/client";
 import type { AssetStatus } from "@prisma/client";
 
 // ============================================
@@ -162,7 +164,40 @@ export async function createAsset(
     revalidatePath("/dashboard/assets");
     return { success: true, assetId: asset.id, assetTag: asset.assetTag };
   } catch (error) {
+    // Re-throw redirect errors so Next.js handles them correctly
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
     console.error("Create asset error:", error);
+
+    // Handle specific Prisma errors
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        // Unique constraint violation
+        const target = (error.meta?.target as string[]) || [];
+        if (target.includes("assetTag")) {
+          return { error: "Asset tag already exists. Please try again." };
+        }
+        if (target.includes("serialNumber")) {
+          return { error: "An asset with this serial number already exists." };
+        }
+        return { error: "A duplicate record was detected. Please check your input." };
+      }
+      if (error.code === "P2003") {
+        // Foreign key constraint failure
+        return { error: "Invalid reference. Please check customer, site, or collection selection." };
+      }
+      if (error.code === "P2025") {
+        // Record not found
+        return { error: "Referenced record not found. Please refresh and try again." };
+      }
+    }
+
+    if (error instanceof Prisma.PrismaClientValidationError) {
+      return { error: "Invalid data format. Please check all fields." };
+    }
+
     return { error: "Failed to create asset. Please try again." };
   }
 }
@@ -254,7 +289,34 @@ export async function updateAsset(
     revalidatePath(`/dashboard/assets/${id}`);
     return { success: true, assetId: id };
   } catch (error) {
+    // Re-throw redirect errors so Next.js handles them correctly
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
     console.error("Update asset error:", error);
+
+    // Handle specific Prisma errors
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        const target = (error.meta?.target as string[]) || [];
+        if (target.includes("serialNumber")) {
+          return { error: "An asset with this serial number already exists." };
+        }
+        return { error: "A duplicate record was detected. Please check your input." };
+      }
+      if (error.code === "P2003") {
+        return { error: "Invalid reference. Please check customer, site, or collection selection." };
+      }
+      if (error.code === "P2025") {
+        return { error: "Asset not found. It may have been deleted." };
+      }
+    }
+
+    if (error instanceof Prisma.PrismaClientValidationError) {
+      return { error: "Invalid data format. Please check all fields." };
+    }
+
     return { error: "Failed to update asset. Please try again." };
   }
 }
@@ -326,7 +388,19 @@ export async function updateAssetStatus(
     revalidatePath(`/dashboard/assets/${assetId}`);
     return { success: true, assetId };
   } catch (error) {
+    // Re-throw redirect errors so Next.js handles them correctly
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
     console.error("Update asset status error:", error);
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2025") {
+        return { error: "Asset not found. It may have been deleted." };
+      }
+    }
+
     return { error: "Failed to update asset status. Please try again." };
   }
 }
@@ -405,7 +479,19 @@ export async function recordDataWipe(
     revalidatePath(`/dashboard/assets/${data.assetId}`);
     return { success: true, assetId: data.assetId };
   } catch (error) {
+    // Re-throw redirect errors so Next.js handles them correctly
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
     console.error("Record data wipe error:", error);
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2025") {
+        return { error: "Asset not found. It may have been deleted." };
+      }
+    }
+
     return { error: "Failed to record data wipe. Please try again." };
   }
 }
@@ -446,7 +532,19 @@ export async function addAssetNote(
     revalidatePath(`/dashboard/assets/${assetId}`);
     return { success: true, assetId };
   } catch (error) {
+    // Re-throw redirect errors so Next.js handles them correctly
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
     console.error("Add asset note error:", error);
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2025") {
+        return { error: "Asset not found. It may have been deleted." };
+      }
+    }
+
     return { error: "Failed to add note. Please try again." };
   }
 }
@@ -522,6 +620,11 @@ export async function bulkCreateAssets(
     revalidatePath("/dashboard/assets");
     return results;
   } catch (error) {
+    // Re-throw redirect errors so Next.js handles them correctly
+    if (isRedirectError(error)) {
+      throw error;
+    }
+
     console.error("Bulk create assets error:", error);
     return { success: false, created: 0, errors: ["Failed to process bulk import"] };
   }

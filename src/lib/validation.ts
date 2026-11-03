@@ -127,21 +127,24 @@ export const searchParamsSchema = z.object({
 // ASSET VALIDATION
 // ============================================
 
-export const assetCategoryEnum = z.enum([
-  "LAPTOP",
-  "DESKTOP",
-  "SERVER",
-  "MONITOR",
-  "MOBILE_PHONE",
-  "TABLET",
-  "PRINTER",
-  "NETWORKING",
-  "STORAGE_DEVICE",
-  "UPS_BATTERY",
-  "PERIPHERAL",
-  "CABLE_ACCESSORY",
-  "OTHER",
-]);
+export const assetCategoryEnum = z.enum(
+  [
+    "LAPTOP",
+    "DESKTOP",
+    "SERVER",
+    "MONITOR",
+    "MOBILE_PHONE",
+    "TABLET",
+    "PRINTER",
+    "NETWORKING",
+    "STORAGE_DEVICE",
+    "UPS_BATTERY",
+    "PERIPHERAL",
+    "CABLE_ACCESSORY",
+    "OTHER",
+  ],
+  { errorMap: () => ({ message: "Please select an asset category" }) }
+);
 
 export const physicalConditionEnum = z.enum([
   "EXCELLENT",
