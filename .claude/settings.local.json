@@ -47,7 +47,9 @@
       "Bash(node -e:*)",
       "Bash(set NODE_OPTIONS=--max-old-space-size=4096)",
       "Bash(npx eslint:*)",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "Bash(npm audit:*)",
+      "Bash(npx next build)"
     ]
   }
 }
