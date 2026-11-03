@@ -143,7 +143,7 @@ export const assetCategoryEnum = z.enum(
     "CABLE_ACCESSORY",
     "OTHER",
   ],
-  { errorMap: () => ({ message: "Please select an asset category" }) }
+  { error: "Please select an asset category" }) }
 );
 
 export const physicalConditionEnum = z.enum([
