@@ -149,10 +149,11 @@ export function AssetForm({
 
           {selectedCategory === "OTHER" && (
             <div className="field">
-              <label htmlFor="categoryOther">Other Category</label>
+              <label htmlFor="categoryOther">Other Category *</label>
               <input
                 id="categoryOther"
                 name="categoryOther"
+                required
                 placeholder="Specify category..."
                 defaultValue={initialData?.categoryOther || ""}
               />

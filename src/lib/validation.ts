@@ -183,7 +183,7 @@ export const dispositionOutcomeEnum = z.enum([
 export const assetSchema = z.object({
   // Core fields
   category: assetCategoryEnum,
-  categoryOther: z.string().max(100).optional().or(z.literal("")),
+  categoryOther: z.string().trim().max(100).optional().or(z.literal("")),
   manufacturer: z.string().trim().max(100).optional().or(z.literal("")),
   model: z.string().trim().max(100).optional().or(z.literal("")),
   serialNumber: z.string().trim().max(100).optional().or(z.literal("")),
@@ -220,7 +220,19 @@ export const assetSchema = z.object({
 
   // Notes
   internalNotes: z.string().max(4000).optional().or(z.literal("")),
-});
+}).refine(
+  (data) => {
+    // categoryOther is required when category is OTHER
+    if (data.category === "OTHER") {
+      return data.categoryOther && data.categoryOther.trim().length > 0;
+    }
+    return true;
+  },
+  {
+    message: "Please specify the category type when selecting 'Other'",
+    path: ["categoryOther"],
+  }
+);
 
 export const assetUpdateSchema = assetSchema.extend({
   id: z.string().min(1),
