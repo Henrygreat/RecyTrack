@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Eraser,
   Plus,
-  Search,
   Filter,
   RefreshCw,
   ChevronLeft,
@@ -70,7 +69,7 @@ export default function ErasureJobsListPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<ErasureJobStatus | "">("");
 
-  const loadJobs = async () => {
+  const loadJobs = useCallback(async () => {
     setLoading(true);
     try {
       const result = await getErasureJobs({
@@ -82,11 +81,11 @@ export default function ErasureJobsListPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
 
   useEffect(() => {
     loadJobs();
-  }, [statusFilter]);
+  }, [loadJobs]);
 
   const statusOptions: ErasureJobStatus[] = [
     "PENDING",

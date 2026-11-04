@@ -321,6 +321,25 @@ export async function getErasureMethods(activeOnly = true) {
   }
 }
 
+export async function getErasureMethodById(id: string) {
+  try {
+    const { organizationId } = await requireMember(undefined, STAFF_ROLES);
+
+    const method = await prisma.erasureMethod.findFirst({
+      where: { id, organizationId },
+    });
+
+    if (!method) {
+      return { success: false, error: "Erasure method not found" };
+    }
+
+    return { success: true, method };
+  } catch (error) {
+    console.error("Get erasure method by ID error:", error);
+    return { success: false, error: "Failed to fetch erasure method" };
+  }
+}
+
 export async function createErasureMethod(data: {
   name: string;
   code: string;
@@ -623,7 +642,7 @@ export async function createErasureJob(data: {
 
 export async function startErasureJob(id: string) {
   try {
-    const { organizationId, userId } = await requireMember(undefined, STAFF_ROLES);
+    const { organizationId } = await requireMember(undefined, STAFF_ROLES);
 
     const job = await prisma.erasureJob.findFirst({
       where: { id, organizationId },

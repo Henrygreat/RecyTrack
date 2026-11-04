@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Shield,
@@ -12,8 +12,10 @@ import {
   CheckCircle,
   XCircle,
   Sparkles,
+  AlertCircle,
+  Eye,
 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { getErasureMethods, seedDefaultErasureMethods, updateErasureMethod } from "../actions";
 import type { ErasureMethodCategory, MediaType, EvidenceType } from "@prisma/client";
 
@@ -49,47 +51,109 @@ type ErasureMethod = {
   createdAt: Date;
 };
 
+type Notification = {
+  type: "success" | "error";
+  message: string;
+} | null;
+
 export default function ErasureMethodsPage() {
   const [methods, setMethods] = useState<ErasureMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
+  const [notification, setNotification] = useState<Notification>(null);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  const loadMethods = async () => {
+  const showNotification = (type: "success" | "error", message: string) => {
+    setNotification({ type, message });
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => setNotification(null), 5000);
+  };
+
+  const loadMethods = useCallback(async () => {
     setLoading(true);
     try {
       const result = await getErasureMethods(!showInactive);
       if (result.success && result.methods) {
         setMethods(result.methods as unknown as ErasureMethod[]);
+      } else {
+        showNotification("error", result.error || "Failed to load erasure methods");
       }
+    } catch {
+      showNotification("error", "An unexpected error occurred while loading methods");
     } finally {
       setLoading(false);
     }
-  };
+  }, [showInactive]);
 
   useEffect(() => {
     loadMethods();
-  }, [showInactive]);
+  }, [loadMethods]);
 
   const handleSeedDefaults = async () => {
     setSeeding(true);
+    setNotification(null);
     try {
       const result = await seedDefaultErasureMethods();
       if (result.success) {
+        showNotification("success", result.message || "Default methods loaded successfully");
         await loadMethods();
+      } else {
+        showNotification("error", result.error || "Failed to load default methods");
       }
+    } catch {
+      showNotification("error", "An unexpected error occurred while loading default methods");
     } finally {
       setSeeding(false);
     }
   };
 
   const handleToggleActive = async (id: string, currentActive: boolean) => {
-    await updateErasureMethod(id, { isActive: !currentActive });
-    await loadMethods();
+    setTogglingId(id);
+    try {
+      const result = await updateErasureMethod(id, { isActive: !currentActive });
+      if (result.success) {
+        showNotification(
+          "success",
+          `Method ${currentActive ? "deactivated" : "activated"} successfully`
+        );
+        await loadMethods();
+      } else {
+        showNotification("error", result.error || "Failed to update method");
+      }
+    } catch {
+      showNotification("error", "An unexpected error occurred");
+    } finally {
+      setTogglingId(null);
+    }
   };
 
   return (
     <div className="space-y-6">
+      {/* Notification */}
+      {notification && (
+        <div
+          className={`flex items-center gap-2 rounded-lg border p-3 text-sm ${
+            notification.type === "success"
+              ? "border-green-200 bg-green-50 text-green-700"
+              : "border-red-200 bg-red-50 text-red-700"
+          }`}
+        >
+          {notification.type === "success" ? (
+            <CheckCircle className="h-4 w-4 flex-shrink-0" />
+          ) : (
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          )}
+          {notification.message}
+          <button
+            onClick={() => setNotification(null)}
+            className="ml-auto text-current hover:opacity-70"
+          >
+            <XCircle className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
@@ -282,17 +346,29 @@ export default function ErasureMethodsPage() {
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => handleToggleActive(method.id, method.isActive)}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-medium ${
+                      disabled={togglingId === method.id}
+                      className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${
                         method.isActive
                           ? "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                           : "bg-teal-600 text-white hover:bg-teal-700"
                       }`}
                     >
+                      {togglingId === method.id && (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      )}
                       {method.isActive ? "Deactivate" : "Activate"}
                     </button>
                     <Link
+                      href={`/dashboard/destruction/methods/${method.id}`}
+                      className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50"
+                      title="View details"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Link>
+                    <Link
                       href={`/dashboard/destruction/methods/${method.id}/edit`}
                       className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-600 hover:bg-slate-50"
+                      title="Edit method"
                     >
                       <Edit className="h-4 w-4" />
                     </Link>

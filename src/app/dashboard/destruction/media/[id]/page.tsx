@@ -106,7 +106,7 @@ export default async function StorageMediaDetailPage({
     notFound();
   }
 
-  const canManage = MANAGEMENT_ROLES.includes(membership.role);
+  const _canManage = MANAGEMENT_ROLES.includes(membership.role);
 
   // Determine available actions based on status
   const canStartErasure =
@@ -115,7 +115,7 @@ export default async function StorageMediaDetailPage({
   const canScheduleDestruction =
     media.sanitisationStatus === "ERASURE_FAILED" ||
     media.sanitisationStatus === "NOT_STARTED";
-  const isComplete =
+  const _isComplete =
     media.sanitisationStatus === "VERIFIED" || media.sanitisationStatus === "DESTROYED";
 
   return (

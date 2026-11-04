@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   Hammer,
@@ -60,7 +60,7 @@ export default function PhysicalDestructionListPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<DestructionStatus | "">("");
 
-  const loadJobs = async () => {
+  const loadJobs = useCallback(async () => {
     setLoading(true);
     try {
       const result = await getDestructionJobs({
@@ -72,11 +72,11 @@ export default function PhysicalDestructionListPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
 
   useEffect(() => {
     loadJobs();
-  }, [statusFilter]);
+  }, [loadJobs]);
 
   const statusOptions: DestructionStatus[] = [
     "SCHEDULED",

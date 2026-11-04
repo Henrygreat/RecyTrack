@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import {
   HardDrive,
@@ -12,7 +12,7 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { getStorageMedia } from "../actions";
 import type { MediaSanitisationStatus, MediaType } from "@prisma/client";
 
@@ -82,7 +82,7 @@ export default function StorageMediaListPage() {
   const [statusFilter, setStatusFilter] = useState<MediaSanitisationStatus | "">("");
   const [typeFilter, setTypeFilter] = useState<MediaType | "">("");
 
-  const loadMedia = async () => {
+  const loadMedia = useCallback(async () => {
     setLoading(true);
     try {
       const result = await getStorageMedia({
@@ -96,11 +96,11 @@ export default function StorageMediaListPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, statusFilter, typeFilter]);
 
   useEffect(() => {
     loadMedia();
-  }, [statusFilter, typeFilter]);
+  }, [loadMedia]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

@@ -96,7 +96,7 @@ const reasonCategories = [
 
 export function DestructionJobForm({
   availableMedia,
-  members,
+  members: _members,
   preSelectedMediaId,
 }: DestructionJobFormProps) {
   const router = useRouter();

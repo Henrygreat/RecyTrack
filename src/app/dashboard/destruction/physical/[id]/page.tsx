@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import {
   ChevronLeft,
   Loader2,
@@ -14,7 +14,6 @@ import {
   FileImage,
   Play,
   Shield,
-  UserCheck,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import {
@@ -110,7 +109,6 @@ type DestructionJobDetail = {
 
 export default function DestructionJobDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const [job, setJob] = useState<DestructionJobDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -118,7 +116,7 @@ export default function DestructionJobDetailPage() {
   const [showAddWitness, setShowAddWitness] = useState(false);
   const [showComplete, setShowComplete] = useState(false);
 
-  const loadJob = async () => {
+  const loadJob = useCallback(async () => {
     setLoading(true);
     try {
       const result = await getDestructionJobById(params.id as string);
@@ -130,11 +128,11 @@ export default function DestructionJobDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.id]);
 
   useEffect(() => {
     loadJob();
-  }, [params.id]);
+  }, [loadJob]);
 
   const handleStart = async () => {
     setActionLoading(true);

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import {
   ChevronLeft,
   Loader2,
@@ -125,7 +125,6 @@ type ErasureJobDetail = {
 
 export default function ErasureJobDetailPage() {
   const params = useParams();
-  const router = useRouter();
   const [job, setJob] = useState<ErasureJobDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
@@ -133,7 +132,7 @@ export default function ErasureJobDetailPage() {
   const [showComplete, setShowComplete] = useState(false);
   const [showApproval, setShowApproval] = useState(false);
 
-  const loadJob = async () => {
+  const loadJob = useCallback(async () => {
     setLoading(true);
     try {
       const result = await getErasureJobById(params.id as string);
@@ -145,11 +144,11 @@ export default function ErasureJobDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [params.id]);
 
   useEffect(() => {
     loadJob();
-  }, [params.id]);
+  }, [loadJob]);
 
   const handleStart = async () => {
     setActionLoading(true);
