@@ -282,7 +282,7 @@ export function CustomerForm({ customer, onSuccess }: CustomerFormProps) {
       </fieldset>
 
       {/* Actions */}
-      <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
+      <div className="form-actions">
         <button
           type="button"
           className="btn btn-secondary"

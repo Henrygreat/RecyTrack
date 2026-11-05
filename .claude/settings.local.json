@@ -54,7 +54,8 @@
       "Bash(export NODE_OPTIONS=\"--max-old-space-size=4096\")",
       "Bash(ls:*)",
       "Bash(echo:*)",
-      "Bash(git -C \"C:\\\\Users\\\\user\\\\Downloads\\\\ENCIF-RecyTrack-Phase1\" log --oneline --all)"
+      "Bash(git -C \"C:\\\\Users\\\\user\\\\Downloads\\\\ENCIF-RecyTrack-Phase1\" log --oneline --all)",
+      "Bash(grep:*)"
     ]
   }
 }

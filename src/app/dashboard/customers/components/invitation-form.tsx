@@ -185,7 +185,7 @@ export function InvitationForm({ customerId, customerName, sites = [], onSuccess
       )}
 
       {/* Actions */}
-      <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end" }}>
+      <div className="form-actions">
         <button
           type="button"
           className="btn btn-secondary"

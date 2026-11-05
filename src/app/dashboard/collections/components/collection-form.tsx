@@ -532,7 +532,7 @@ export function CollectionForm({ customers, routes, initialData }: CollectionFor
       </fieldset>
 
       {/* Actions */}
-      <div style={{ display: "flex", gap: "1rem", justifyContent: "flex-end", paddingTop: "1rem", borderTop: "1px solid #e2e8f0" }}>
+      <div className="form-actions">
         <button
           type="button"
           className="btn btn-secondary"

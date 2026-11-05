@@ -129,9 +129,12 @@ body {
 /* Premium Button */
 .btn-premium {
   @apply inline-flex items-center justify-center gap-2;
-  @apply px-3 py-2 text-sm font-medium rounded-md;
+  @apply px-4 py-2.5 text-sm font-medium rounded-lg;
   @apply transition-all duration-150;
   @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+  min-height: 40px;
+  max-height: 44px;
+  flex-shrink: 0;
 }
 
 .btn-primary {
@@ -222,8 +225,31 @@ body {
 .panel { margin: 20px 0; }
 .panel h2 { margin-top: 0; }
 
-.btn { display: inline-block; background: #0d9488; border: 0; color: white; border-radius: 9px; padding: 11px 17px; font-weight: 700; }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: #0d9488;
+  border: 0;
+  color: white;
+  border-radius: 9px;
+  padding: 11px 17px;
+  height: auto;
+  min-height: 42px;
+  max-height: 48px;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.25;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  flex-shrink: 0;
+  align-self: center;
+}
+.btn:hover { background: #0f766e; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn.secondary, .btn.btn-secondary { background: #e5f3f1; color: #09635e; }
+.btn.btn-secondary:hover { background: #d1e9e6; }
 
 .table { width: 100%; border-collapse: collapse; }
 .table th, .table td { text-align: left; padding: 14px 10px; border-bottom: 1px solid #edf0f1; font-size: 14px; }
@@ -232,11 +258,23 @@ body {
 .tag { padding: 5px 9px; background: #e8f5f1; color: #11685f; border-radius: 30px; font-size: 12px; }
 .badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 500; display: inline-block; }
 
-.form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-width: 820px; }
+.form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-width: 820px; align-items: start; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field label { font-size: 13px; font-weight: 700; }
 .field input, .field select, .field textarea { padding: 12px; border: 1px solid #cdd8dc; border-radius: 9px; background: white; width: 100%; }
 .wide { grid-column: 1 / -1; }
+
+/* Form Actions - Button Container */
+.form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+  margin-top: 0.5rem;
+}
 
 .login { max-width: 430px; margin: 12vh auto; }
 .login .form { display: flex; flex-direction: column; }

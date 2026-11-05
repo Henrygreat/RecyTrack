@@ -329,34 +329,19 @@ export function CustodyTransferForm({
       </fieldset>
 
       {/* Submit */}
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.75rem" }}>
+      <div className="form-actions">
         <button
           type="button"
+          className="btn btn-secondary"
           onClick={() => router.back()}
-          style={{
-            padding: "0.625rem 1.25rem",
-            backgroundColor: "#f1f5f9",
-            color: "#475569",
-            border: "none",
-            borderRadius: "0.375rem",
-            fontWeight: "500",
-            cursor: "pointer",
-          }}
+          disabled={isPending}
         >
           Cancel
         </button>
         <button
           type="submit"
+          className="btn"
           disabled={isPending}
-          style={{
-            padding: "0.625rem 1.25rem",
-            backgroundColor: isPending ? "#94a3b8" : "#0d9488",
-            color: "white",
-            border: "none",
-            borderRadius: "0.375rem",
-            fontWeight: "500",
-            cursor: isPending ? "not-allowed" : "pointer",
-          }}
         >
           {isPending ? "Initiating..." : "Initiate Transfer"}
         </button>
