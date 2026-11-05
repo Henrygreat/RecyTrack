@@ -145,13 +145,16 @@ export default function ExceptionsPage() {
               className="rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
             >
               <option value="">All Categories</option>
-              <option value="PROCESS_DEVIATION">Process Deviation</option>
-              <option value="EQUIPMENT_FAILURE">Equipment Failure</option>
-              <option value="DOCUMENTATION_ERROR">Documentation Error</option>
-              <option value="DATA_BREACH">Data Breach</option>
-              <option value="VERIFICATION_FAILURE">Verification Failure</option>
-              <option value="CHAIN_OF_CUSTODY">Chain of Custody</option>
-              <option value="UNAUTHORISED_ACCESS">Unauthorised Access</option>
+              <option value="ERASURE_FAILURE">Erasure Failure</option>
+              <option value="MISSING_MEDIA">Missing Media</option>
+              <option value="SERIAL_MISMATCH">Serial Number Mismatch</option>
+              <option value="MISSING_EVIDENCE">Missing Evidence</option>
+              <option value="UNAPPROVED_METHOD">Unapproved Method</option>
+              <option value="UNVERIFIED_DESTRUCTION">Unverified Destruction</option>
+              <option value="OVERDUE_APPROVAL">Overdue Approval</option>
+              <option value="CERTIFICATE_ERROR">Certificate Error</option>
+              <option value="EXPIRED_POLICY">Expired Policy</option>
+              <option value="CUSTODY_DISCREPANCY">Custody Discrepancy</option>
               <option value="OTHER">Other</option>
             </select>
           </div>

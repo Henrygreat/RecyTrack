@@ -417,6 +417,80 @@ export const custodyExceptionResolveSchema = z.object({
   resolutionNotes: z.string().min(1, "Resolution notes required").max(2000),
 });
 
+// ============================================
+// COMPLIANCE POLICY VALIDATION
+// ============================================
+
+export const compliancePolicySchema = z.object({
+  title: z.string().trim().min(3, "Title must be at least 3 characters").max(200),
+  description: z.string().max(2000).optional().or(z.literal("")),
+  effectiveDate: z.string().optional().or(z.literal("")),
+  reviewDate: z.string().optional().or(z.literal("")),
+  policyContent: z.string().max(50000).optional().or(z.literal("")),
+  documentUrl: z.string().url("Invalid URL").optional().or(z.literal("")),
+  approvedErasureMethods: z.string().optional().or(z.literal("")), // Comma-separated
+  approvedDestructionMethods: z.string().optional().or(z.literal("")), // Comma-separated
+  complianceStandards: z.string().optional().or(z.literal("")), // Comma-separated
+});
+
+// ============================================
+// COMPLIANCE EXCEPTION VALIDATION
+// ============================================
+
+export const complianceExceptionCategoryEnum = z.enum([
+  "ERASURE_FAILURE",
+  "MISSING_MEDIA",
+  "SERIAL_MISMATCH",
+  "MISSING_EVIDENCE",
+  "UNAPPROVED_METHOD",
+  "UNVERIFIED_DESTRUCTION",
+  "OVERDUE_APPROVAL",
+  "CERTIFICATE_ERROR",
+  "EXPIRED_POLICY",
+  "CUSTODY_DISCREPANCY",
+  "OTHER",
+]);
+
+export const complianceExceptionSeverityEnum = z.enum([
+  "LOW",
+  "MEDIUM",
+  "HIGH",
+  "CRITICAL",
+]);
+
+export const complianceExceptionSchema = z.object({
+  title: z.string().trim().min(3, "Title must be at least 3 characters").max(200),
+  description: z.string().min(10, "Description must be at least 10 characters").max(4000),
+  category: complianceExceptionCategoryEnum,
+  severity: complianceExceptionSeverityEnum,
+  assetId: z.string().optional().or(z.literal("")),
+  storageMediaId: z.string().optional().or(z.literal("")),
+  erasureJobId: z.string().optional().or(z.literal("")),
+  destructionJobId: z.string().optional().or(z.literal("")),
+  customerId: z.string().optional().or(z.literal("")),
+  isBlocking: z.coerce.boolean().default(false),
+  assignedToUserId: z.string().optional().or(z.literal("")),
+  correctiveActionDue: z.string().optional().or(z.literal("")),
+});
+
+// ============================================
+// COMPLIANCE AUDIT VALIDATION
+// ============================================
+
+export const complianceAuditSchema = z.object({
+  title: z.string().trim().min(3, "Title must be at least 3 characters").max(200),
+  description: z.string().max(4000).optional().or(z.literal("")),
+  auditType: z.string().max(100).optional().or(z.literal("")),
+  scope: z.string().max(2000).optional().or(z.literal("")),
+  customerId: z.string().optional().or(z.literal("")),
+  plannedStartDate: z.string().optional().or(z.literal("")),
+  plannedEndDate: z.string().optional().or(z.literal("")),
+  auditorName: z.string().max(100).optional().or(z.literal("")),
+  auditorEmail: z.string().email("Invalid email").optional().or(z.literal("")),
+  externalAuditor: z.coerce.boolean().default(false),
+  auditorOrganization: z.string().max(200).optional().or(z.literal("")),
+});
+
 // Type exports
 export type CustomerInput = z.infer<typeof customerSchema>;
 export type CustomerUpdateInput = z.infer<typeof customerUpdateSchema>;

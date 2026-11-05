@@ -949,3 +949,186 @@ export async function getComplianceStats() {
     return { success: false, error: "Failed to fetch stats" };
   }
 }
+
+// ============================================
+// FORM ACTION WRAPPERS
+// ============================================
+
+import {
+  compliancePolicySchema,
+  complianceExceptionSchema,
+  complianceAuditSchema,
+} from "@/lib/validation";
+
+export type PolicyFormState = {
+  error?: string;
+  success?: boolean;
+  policyId?: string;
+  reference?: string;
+};
+
+export type ExceptionFormState = {
+  error?: string;
+  success?: boolean;
+  exceptionId?: string;
+  reference?: string;
+};
+
+export type AuditFormState = {
+  error?: string;
+  success?: boolean;
+  auditId?: string;
+  reference?: string;
+};
+
+export async function createPolicyFromForm(
+  _prevState: PolicyFormState,
+  formData: FormData
+): Promise<PolicyFormState> {
+  try {
+    const rawData = Object.fromEntries(formData);
+    const parsed = compliancePolicySchema.safeParse(rawData);
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message || "Invalid input" };
+    }
+
+    const data = parsed.data;
+
+    // Convert comma-separated strings to arrays
+    const approvedErasureMethods = data.approvedErasureMethods
+      ? data.approvedErasureMethods.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+    const approvedDestructionMethods = data.approvedDestructionMethods
+      ? data.approvedDestructionMethods.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+    const complianceStandards = data.complianceStandards
+      ? data.complianceStandards.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+
+    const result = await createPolicy({
+      title: data.title,
+      description: data.description || undefined,
+      effectiveDate: data.effectiveDate ? new Date(data.effectiveDate) : undefined,
+      reviewDate: data.reviewDate ? new Date(data.reviewDate) : undefined,
+      policyContent: data.policyContent || undefined,
+      documentUrl: data.documentUrl || undefined,
+      approvedErasureMethods,
+      approvedDestructionMethods,
+      complianceStandards,
+    });
+
+    if (!result.success) {
+      return { error: result.error || "Failed to create policy" };
+    }
+
+    return {
+      success: true,
+      policyId: result.policy?.id,
+      reference: result.policy?.reference,
+    };
+  } catch (error) {
+    console.error("Create policy form error:", error);
+    return { error: "Failed to create policy. Please try again." };
+  }
+}
+
+export async function createExceptionFromForm(
+  _prevState: ExceptionFormState,
+  formData: FormData
+): Promise<ExceptionFormState> {
+  try {
+    const rawData = Object.fromEntries(formData);
+    const parsed = complianceExceptionSchema.safeParse(rawData);
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message || "Invalid input" };
+    }
+
+    const data = parsed.data;
+
+    // Get assigned user name if ID provided
+    let assignedToName: string | undefined;
+    if (data.assignedToUserId) {
+      const user = await prisma.user.findUnique({
+        where: { id: data.assignedToUserId },
+        select: { name: true, email: true },
+      });
+      assignedToName = user?.name || user?.email || undefined;
+    }
+
+    const result = await createException({
+      title: data.title,
+      description: data.description,
+      category: data.category,
+      severity: data.severity,
+      assetId: data.assetId || undefined,
+      storageMediaId: data.storageMediaId || undefined,
+      erasureJobId: data.erasureJobId || undefined,
+      destructionJobId: data.destructionJobId || undefined,
+      customerId: data.customerId || undefined,
+      isBlocking: data.isBlocking,
+      assignedToUserId: data.assignedToUserId || undefined,
+      assignedToName,
+      correctiveActionDue: data.correctiveActionDue
+        ? new Date(data.correctiveActionDue)
+        : undefined,
+    });
+
+    if (!result.success) {
+      return { error: result.error || "Failed to create exception" };
+    }
+
+    return {
+      success: true,
+      exceptionId: result.exception?.id,
+      reference: result.exception?.reference,
+    };
+  } catch (error) {
+    console.error("Create exception form error:", error);
+    return { error: "Failed to create exception. Please try again." };
+  }
+}
+
+export async function createAuditFromForm(
+  _prevState: AuditFormState,
+  formData: FormData
+): Promise<AuditFormState> {
+  try {
+    const rawData = Object.fromEntries(formData);
+    const parsed = complianceAuditSchema.safeParse(rawData);
+
+    if (!parsed.success) {
+      return { error: parsed.error.issues[0]?.message || "Invalid input" };
+    }
+
+    const data = parsed.data;
+
+    const result = await createAudit({
+      title: data.title,
+      description: data.description || undefined,
+      auditType: data.auditType || undefined,
+      scope: data.scope || undefined,
+      customerId: data.customerId || undefined,
+      plannedStartDate: data.plannedStartDate ? new Date(data.plannedStartDate) : undefined,
+      plannedEndDate: data.plannedEndDate ? new Date(data.plannedEndDate) : undefined,
+      auditorName: data.auditorName || undefined,
+      auditorEmail: data.auditorEmail || undefined,
+      externalAuditor: data.externalAuditor,
+      auditorOrganization: data.auditorOrganization || undefined,
+    });
+
+    if (!result.success) {
+      return { error: result.error || "Failed to create audit" };
+    }
+
+    return {
+      success: true,
+      auditId: result.audit?.id,
+      reference: result.audit?.reference,
+    };
+  } catch (error) {
+    console.error("Create audit form error:", error);
+    return { error: "Failed to create audit. Please try again." };
+  }
+}
