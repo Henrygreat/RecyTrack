@@ -71,15 +71,15 @@ const navigation: NavGroup[] = [
   {
     label: "Business",
     items: [
-      { label: "Documents", href: "/dashboard/documents", icon: FileText, badge: "Soon" },
+      { label: "Documents", href: "/dashboard/documents", icon: FileText },
       { label: "Reports", href: "/dashboard/reports", icon: BarChart3 },
     ],
   },
   {
     label: "Administration",
     items: [
-      { label: "Settings", href: "/dashboard/settings", icon: Settings, badge: "Soon" },
-      { label: "Users", href: "/dashboard/users", icon: UserCog, badge: "Soon" },
+      { label: "Settings", href: "/dashboard/settings", icon: Settings },
+      { label: "Users", href: "/dashboard/users", icon: UserCog },
     ],
   },
 ];

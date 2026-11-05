@@ -245,21 +245,52 @@ enum StocktakeItemStatus {
 // ============================================
 
 model User {
-  id              String               @id @default(cuid())
-  name            String?
-  email           String               @unique
-  passwordHash    String
-  createdAt       DateTime             @default(now())
-  memberships     Membership[]
-  customerAccess  CustomerAccess[]
-  invitationsSent CustomerInvitation[] @relation("InvitedBy")
+  id                     String               @id @default(cuid())
+  name                   String?
+  email                  String               @unique
+  passwordHash           String
+  createdAt              DateTime             @default(now())
+  lastLoginAt            DateTime?
+  lastActiveAt           DateTime?
+  memberships            Membership[]
+  customerAccess         CustomerAccess[]
+  invitationsSent        CustomerInvitation[] @relation("InvitedBy")
+  staffInvitationsSent   StaffInvitation[]    @relation("StaffInvitedBy")
+  deactivatedMemberships Membership[]         @relation("DeactivatedBy")
 }
 
 model Organization {
-  id                   String                @id @default(cuid())
-  name                 String
-  slug                 String                @unique
-  createdAt            DateTime              @default(now())
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Profile Information
+  tradingName        String?
+  registrationNumber String? // Company registration number
+  vatNumber          String?
+  registeredAddress  String?
+  operationalAddress String?
+  contactEmail       String?
+  contactPhone       String?
+  website            String?
+  description        String?
+
+  // Branding
+  logoUrl        String?
+  primaryColor   String? // Hex color e.g. #0f766e
+  secondaryColor String? // Hex color
+  documentHeader String? // Text for document headers
+  documentFooter String? // Text for document footers
+
+  // Operational Settings (JSON for flexibility)
+  settings Json? // { timezone, dateFormat, assetPrefix, collectionCutoff, etc. }
+
+  // Notification Preferences (JSON)
+  notifications Json? // { newCustomer: true, bookingConfirmed: true, etc. }
+
+  // Relations
   memberships          Membership[]
   customers            Customer[]
   sites                Site[]
@@ -273,6 +304,7 @@ model Organization {
   warehouseLocations   WarehouseLocation[]
   auditLogs            AuditLog[]
   customerInvitations  CustomerInvitation[]
+  staffInvitations     StaffInvitation[]
   inspectionTemplates  InspectionTemplate[]
   inspections          Inspection[]
   assetQuarantines     AssetQuarantine[]
@@ -290,18 +322,27 @@ model Organization {
   complianceExceptions ComplianceException[]
   complianceAudits     ComplianceAudit[]
   complianceEvidence   ComplianceEvidence[]
+  // Phase 5.6: Document Management
+  documents            Document[]
 }
 
 model Membership {
-  id             String       @id @default(cuid())
-  userId         String
-  organizationId String
-  role           Role
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  id              String       @id @default(cuid())
+  userId          String
+  organizationId  String
+  role            Role
+  isActive        Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  deactivatedAt   DateTime?
+  deactivatedById String?
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  deactivatedBy   User?        @relation("DeactivatedBy", fields: [deactivatedById], references: [id])
 
   @@unique([userId, organizationId])
   @@index([organizationId, role])
+  @@index([organizationId, isActive])
 }
 
 // ============================================
@@ -469,6 +510,37 @@ model CustomerInvitation {
 
   @@index([token])
   @@index([customerId])
+  @@index([email])
+  @@index([organizationId, expiresAt])
+  @@index([emailMessageId])
+}
+
+model StaffInvitation {
+  id              String    @id @default(cuid())
+  organizationId  String
+  email           String
+  name            String? // Optional name for the invitee
+  role            Role      @default(OPERATIONS)
+  token           String    @unique
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  invitedByUserId String
+  createdAt       DateTime  @default(now())
+
+  // Email delivery tracking (same as CustomerInvitation)
+  emailSentAt        DateTime?
+  emailMessageId     String?
+  emailDeliveredAt   DateTime?
+  emailFailedAt      DateTime?
+  emailFailureReason String?
+  lastResendAt       DateTime?
+  resendCount        Int       @default(0)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  invitedBy    User         @relation("StaffInvitedBy", fields: [invitedByUserId], references: [id])
+
+  @@index([token])
   @@index([email])
   @@index([organizationId, expiresAt])
   @@index([emailMessageId])
@@ -2301,4 +2373,87 @@ model ComplianceEvidence {
   @@index([destructionJobId])
   @@index([certificateId])
   @@index([auditId])
+}
+
+// ============================================
+// PHASE 5.6: DOCUMENT MANAGEMENT
+// ============================================
+
+enum DocumentCategory {
+  POLICY             // Company policies
+  PROCEDURE          // Standard operating procedures
+  TEMPLATE           // Document templates
+  FORM               // Blank forms
+  CONTRACT           // Contracts and agreements
+  COMPLIANCE         // Compliance documentation
+  TRAINING           // Training materials
+  REPORT             // Generated reports
+  OTHER              // Miscellaneous
+}
+
+enum DocumentStatus {
+  DRAFT              // Not yet approved
+  ACTIVE             // Current approved version
+  ARCHIVED           // Superseded by newer version
+  DELETED            // Soft deleted
+}
+
+model Document {
+  id             String @id @default(cuid())
+  organizationId String
+
+  // Identification
+  reference   String // Document reference e.g. DOC-00001
+  title       String
+  description String?
+
+  // Classification
+  category DocumentCategory
+  status   DocumentStatus   @default(DRAFT)
+  tags     String[]         // Free-form tags for filtering
+
+  // Version control
+  version           Int      @default(1)
+  parentDocumentId  String?  // Link to parent document (for versioning)
+  isCurrentVersion  Boolean  @default(true)
+
+  // File details
+  fileName    String
+  fileUrl     String
+  fileSize    Int?     // Size in bytes
+  mimeType    String?
+  fileHash    String?  // SHA-256 hash for integrity
+
+  // Ownership & approval
+  ownerUserId      String?
+  ownerName        String?
+  approvedAt       DateTime?
+  approvedByUserId String?
+  approvedByName   String?
+
+  // Review cycle
+  effectiveDate  DateTime? // When document becomes effective
+  reviewDate     DateTime? // When document should be reviewed
+  expiryDate     DateTime? // When document expires
+
+  // Access control
+  isRestricted   Boolean @default(false)
+  allowedRoles   Role[]  // Roles that can view this document (empty = all)
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  uploadedByUserId String?
+  uploadedByName   String?
+
+  // Relations
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parentDocument Document?    @relation("DocumentVersions", fields: [parentDocumentId], references: [id])
+  versions       Document[]   @relation("DocumentVersions")
+
+  @@unique([organizationId, reference, version])
+  @@index([organizationId, category])
+  @@index([organizationId, status])
+  @@index([organizationId, isCurrentVersion])
+  @@index([parentDocumentId])
 }

@@ -161,6 +161,85 @@ export async function sendCollectionEmail(params: {
   }
 }
 
+/**
+ * Send staff invitation email
+ */
+export async function sendStaffInvitationEmail(params: {
+  to: string;
+  inviteeName?: string;
+  invitedByName: string;
+  organizationName: string;
+  role: string;
+  token: string;
+  expiresAt: Date;
+}): Promise<SendEmailResult> {
+  if (!isEmailConfigured()) {
+    return {
+      success: false,
+      error: "Email service not configured. Set RESEND_API_KEY environment variable.",
+    };
+  }
+
+  const { to, inviteeName, invitedByName, organizationName, role, token, expiresAt } = params;
+  const inviteUrl = `${APP_URL}/invite/staff?token=${token}`;
+
+  const roleLabels: Record<string, string> = {
+    ADMIN: "Administrator",
+    OPERATIONS: "Operations Manager",
+    WAREHOUSE: "Warehouse Staff",
+    DRIVER: "Driver",
+  };
+  const roleLabel = roleLabels[role] || role;
+
+  const expiryDate = expiresAt.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  try {
+    const result = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: [to],
+      subject: `You've been invited to join ${organizationName} on RecyTrack`,
+      html: generateStaffInvitationEmailHtml({
+        inviteeName,
+        invitedByName,
+        organizationName,
+        roleLabel,
+        inviteUrl,
+        expiryDate,
+      }),
+      text: generateStaffInvitationEmailText({
+        inviteeName,
+        invitedByName,
+        organizationName,
+        roleLabel,
+        inviteUrl,
+        expiryDate,
+      }),
+    });
+
+    if (result.error) {
+      return {
+        success: false,
+        error: result.error.message,
+      };
+    }
+
+    return {
+      success: true,
+      messageId: result.data?.id,
+    };
+  } catch (error) {
+    console.error("Failed to send staff invitation email:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error sending email",
+    };
+  }
+}
+
 // ============================================
 // EMAIL TEMPLATES
 // ============================================
@@ -441,5 +520,146 @@ Log in to your RecyTrack portal to view full details and track progress.
 
 ---
 This is an automated notification from RecyTrack.
+`.trim();
+}
+
+// ============================================
+// STAFF INVITATION TEMPLATES
+// ============================================
+
+function generateStaffInvitationEmailHtml(params: {
+  inviteeName?: string;
+  invitedByName: string;
+  organizationName: string;
+  roleLabel: string;
+  inviteUrl: string;
+  expiryDate: string;
+}): string {
+  const { inviteeName, invitedByName, organizationName, roleLabel, inviteUrl, expiryDate } = params;
+
+  const greeting = inviteeName ? `Hello ${inviteeName},` : "Hello,";
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RecyTrack Staff Invitation</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <tr>
+      <td>
+        <!-- Header -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 32px;">
+          <tr>
+            <td style="text-align: center;">
+              <div style="display: inline-block; background-color: #0f766e; color: white; font-weight: 700; font-size: 24px; padding: 12px 24px; border-radius: 8px; letter-spacing: -0.5px;">
+                RecyTrack
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Main Content -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden;">
+          <tr>
+            <td style="padding: 40px;">
+              <h1 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 600; color: #0f172a; line-height: 1.3;">
+                Join Your Team on RecyTrack
+              </h1>
+
+              <p style="margin: 0 0 24px 0; font-size: 16px; color: #475569; line-height: 1.6;">
+                ${greeting}
+              </p>
+
+              <p style="margin: 0 0 24px 0; font-size: 16px; color: #475569; line-height: 1.6;">
+                <strong>${invitedByName}</strong> has invited you to join <strong>${organizationName}</strong> on RecyTrack as a <strong>${roleLabel}</strong>.
+              </p>
+
+              <p style="margin: 0 0 32px 0; font-size: 16px; color: #475569; line-height: 1.6;">
+                Click the button below to create your account and start managing collections, assets, and warehouse operations.
+              </p>
+
+              <!-- CTA Button -->
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto 32px auto;">
+                <tr>
+                  <td style="border-radius: 8px; background-color: #0f766e;">
+                    <a href="${inviteUrl}" target="_blank" style="display: inline-block; padding: 16px 32px; font-size: 16px; font-weight: 600; color: white; text-decoration: none; border-radius: 8px;">
+                      Accept Invitation
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Link fallback -->
+              <p style="margin: 0 0 24px 0; font-size: 14px; color: #64748b; line-height: 1.6;">
+                Or copy and paste this link into your browser:
+              </p>
+              <p style="margin: 0 0 32px 0; font-size: 14px; color: #0f766e; word-break: break-all; background-color: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                ${inviteUrl}
+              </p>
+
+              <!-- Expiry notice -->
+              <div style="padding: 16px; background-color: #fef3c7; border-radius: 8px; border-left: 4px solid #f59e0b;">
+                <p style="margin: 0; font-size: 14px; color: #92400e;">
+                  <strong>This invitation expires on ${expiryDate}.</strong> Please accept it before then.
+                </p>
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Footer -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top: 32px;">
+          <tr>
+            <td style="text-align: center;">
+              <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748b;">
+                This email was sent by RecyTrack on behalf of ${organizationName}.
+              </p>
+              <p style="margin: 0; font-size: 12px; color: #94a3b8;">
+                If you didn't expect this invitation, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+}
+
+function generateStaffInvitationEmailText(params: {
+  inviteeName?: string;
+  invitedByName: string;
+  organizationName: string;
+  roleLabel: string;
+  inviteUrl: string;
+  expiryDate: string;
+}): string {
+  const { inviteeName, invitedByName, organizationName, roleLabel, inviteUrl, expiryDate } = params;
+
+  const greeting = inviteeName ? `Hello ${inviteeName},` : "Hello,";
+
+  return `
+RecyTrack Staff Invitation
+
+${greeting}
+
+${invitedByName} has invited you to join ${organizationName} on RecyTrack as a ${roleLabel}.
+
+Accept your invitation by visiting:
+${inviteUrl}
+
+You'll be able to manage collections, assets, and warehouse operations.
+
+This invitation expires on ${expiryDate}. Please accept it before then.
+
+---
+This email was sent by RecyTrack on behalf of ${organizationName}.
+If you didn't expect this invitation, you can safely ignore this email.
 `.trim();
 }
