@@ -19,6 +19,7 @@ import { sendCollectionEmail, isEmailConfigured } from "@/lib/email";
 const createCollectionSchema = z.object({
   customerId: z.string().min(1, "Customer is required"),
   siteId: z.string().optional(),
+  routeDateId: z.string().optional(), // For scheduled route bookings
   collectionType: z.enum(["STANDARD", "SECURE_DATA", "HAZARDOUS", "LARGE_ITEMS", "MIXED"]).default("STANDARD"),
   priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).default("NORMAL"),
   requestedDate: z.string().optional(),
@@ -134,15 +135,59 @@ export async function createCollection(
     });
 
     const collection = await prisma.$transaction(async (tx) => {
+      // Handle route date booking with capacity validation
+      let routeDate = null;
+      let scheduledDate = null;
+      // SCHEDULED = booked against a published route date
+      // ALTERNATIVE = collection requested outside the published route calendar
+      let bookingMode: "SCHEDULED" | "ALTERNATIVE" = "ALTERNATIVE";
+
+      if (data.routeDateId) {
+        routeDate = await tx.routeDate.findFirst({
+          where: {
+            id: data.routeDateId,
+            organizationId,
+            isOpen: true,
+          },
+          include: {
+            _count: {
+              select: {
+                collections: { where: { status: { not: "CANCELLED" } } },
+              },
+            },
+          },
+        });
+
+        if (!routeDate) {
+          throw new Error("Route not found or not open for bookings");
+        }
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (routeDate.serviceDate < today) {
+          throw new Error("Cannot book past routes");
+        }
+
+        if (routeDate._count.collections >= routeDate.capacity) {
+          throw new Error("This route is at full capacity. Please select another date.");
+        }
+
+        scheduledDate = routeDate.serviceDate;
+        bookingMode = "SCHEDULED";
+      }
+
       const coll = await tx.collection.create({
         data: {
           organizationId,
           reference,
           customerId: data.customerId,
           siteId: data.siteId || null,
+          routeDateId: routeDate?.id || null,
+          bookingMode,
           collectionType: data.collectionType as CollectionType,
           priority: data.priority as CollectionPriority,
           requestedDate: data.requestedDate ? new Date(data.requestedDate + "T12:00:00.000Z") : null,
+          scheduledDate,
           status: initialStatus,
           address: data.address,
           postcode: data.postcode.toUpperCase(),
@@ -188,22 +233,30 @@ export async function createCollection(
 
     // Send confirmation email if requested (not draft)
     if (!data.submitAsDraft && isEmailConfigured() && customer.email) {
+      // Use scheduled date from route if available, otherwise use requested date
+      const emailDate = collection.scheduledDate ||
+        (data.requestedDate ? new Date(data.requestedDate) : undefined);
+
       await sendCollectionEmail({
         to: customer.email,
         type: "booking_confirmed",
         collectionRef: reference,
         customerName: customer.name,
         siteName: site?.name,
-        collectionDate: data.requestedDate ? new Date(data.requestedDate) : undefined,
+        collectionDate: emailDate,
       });
     }
 
     revalidatePath("/dashboard/collections");
     revalidatePath(`/dashboard/customers/${data.customerId}`);
+    revalidatePath("/dashboard/routes"); // Update route capacity display
 
     return { success: true, collectionId: collection.id };
   } catch (error) {
     console.error("Create collection error:", error);
+    if (error instanceof Error) {
+      return { error: error.message };
+    }
     return { error: "Failed to create collection. Please try again." };
   }
 }

@@ -55,7 +55,9 @@
       "Bash(ls:*)",
       "Bash(echo:*)",
       "Bash(git -C \"C:\\\\Users\\\\user\\\\Downloads\\\\ENCIF-RecyTrack-Phase1\" log --oneline --all)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(tail:*)",
+      "Bash(set DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy)"
     ]
   }
 }

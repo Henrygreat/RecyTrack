@@ -788,3 +788,295 @@ export async function getPortalReportData(reportType: string, filters?: {
       return { success: false, error: "Unknown report type" };
   }
 }
+
+// ============================================
+// COLLECTION BOOKING
+// ============================================
+
+export async function getCustomerSites() {
+  const ctx = await requireCustomerAccess();
+
+  const sites = await prisma.site.findMany({
+    where: {
+      customerId: ctx.customerId,
+      ...(ctx.authorizedSiteIds ? { id: { in: ctx.authorizedSiteIds } } : {}),
+    },
+    select: {
+      id: true,
+      name: true,
+      address: true,
+      postcode: true,
+      zoneId: true,
+      zone: {
+        select: { id: true, name: true },
+      },
+    },
+    orderBy: { name: "asc" },
+  });
+
+  return { success: true, sites };
+}
+
+export async function getAvailableBookingDates(siteId: string) {
+  const ctx = await requireCustomerAccess();
+
+  // Verify site belongs to customer and user has access
+  const site = await prisma.site.findFirst({
+    where: {
+      id: siteId,
+      customerId: ctx.customerId,
+      ...(ctx.authorizedSiteIds ? { id: { in: ctx.authorizedSiteIds } } : {}),
+    },
+    select: {
+      id: true,
+      postcode: true,
+      zoneId: true,
+    },
+  });
+
+  if (!site) {
+    return { success: false, error: "Site not found" };
+  }
+
+  // If site has a zone, use that; otherwise match by postcode
+  let zoneIds: string[] = [];
+
+  if (site.zoneId) {
+    zoneIds = [site.zoneId];
+  } else if (site.postcode) {
+    const postcodePrefix = site.postcode.split(" ")[0]?.toUpperCase() || "";
+    const zones = await prisma.collectionZone.findMany({
+      where: {
+        organizationId: ctx.organizationId,
+        postcodePrefixes: { has: postcodePrefix },
+      },
+      select: { id: true },
+    });
+    zoneIds = zones.map((z) => z.id);
+  }
+
+  if (zoneIds.length === 0) {
+    return { success: true, routes: [], message: "No collection service available for this location" };
+  }
+
+  // Find open routes with available capacity
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const routes = await prisma.routeDate.findMany({
+    where: {
+      organizationId: ctx.organizationId,
+      zoneId: { in: zoneIds },
+      serviceDate: { gte: today },
+      isOpen: true,
+    },
+    include: {
+      zone: { select: { name: true } },
+      _count: {
+        select: {
+          collections: { where: { status: { not: "CANCELLED" } } },
+        },
+      },
+    },
+    orderBy: { serviceDate: "asc" },
+    take: 30,
+  });
+
+  // Filter to routes with available capacity
+  const availableRoutes = routes
+    .filter((r) => r.capacity > r._count.collections)
+    .map((r) => ({
+      id: r.id,
+      serviceDate: r.serviceDate,
+      zoneName: r.zone.name,
+      available: r.capacity - r._count.collections,
+    }));
+
+  return { success: true, routes: availableRoutes };
+}
+
+export type BookingFormState = {
+  error?: string;
+  success?: boolean;
+  collectionId?: string;
+  reference?: string;
+};
+
+export async function createPortalBooking(
+  _prevState: BookingFormState,
+  formData: FormData
+): Promise<BookingFormState> {
+  const ctx = await requireCustomerAccess();
+
+  try {
+    const siteId = formData.get("siteId") as string;
+    const routeDateId = formData.get("routeDateId") as string;
+    const equipmentCategories = formData.get("equipmentCategories") as string;
+    const itemEstimate = parseInt(formData.get("itemEstimate") as string, 10) || 0;
+    const customerInstructions = formData.get("customerInstructions") as string;
+    const contactName = formData.get("contactName") as string;
+    const contactPhone = formData.get("contactPhone") as string;
+    const contactEmail = formData.get("contactEmail") as string;
+
+    // Validate required fields
+    if (!siteId || !routeDateId) {
+      return { error: "Please select a site and collection date" };
+    }
+
+    // Verify site belongs to customer
+    const site = await prisma.site.findFirst({
+      where: {
+        id: siteId,
+        customerId: ctx.customerId,
+        ...(ctx.authorizedSiteIds ? { id: { in: ctx.authorizedSiteIds } } : {}),
+      },
+    });
+
+    if (!site) {
+      return { error: "Site not found" };
+    }
+
+    // Use transaction to check and reserve capacity
+    const result = await prisma.$transaction(async (tx) => {
+      // Lock and check route capacity
+      const routeDate = await tx.routeDate.findFirst({
+        where: {
+          id: routeDateId,
+          organizationId: ctx.organizationId,
+          isOpen: true,
+        },
+        include: {
+          _count: {
+            select: {
+              collections: { where: { status: { not: "CANCELLED" } } },
+            },
+          },
+        },
+      });
+
+      if (!routeDate) {
+        throw new Error("Route not found or not open for bookings");
+      }
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (routeDate.serviceDate < today) {
+        throw new Error("Cannot book past dates");
+      }
+
+      if (routeDate._count.collections >= routeDate.capacity) {
+        throw new Error("This date is now fully booked. Please select another date.");
+      }
+
+      // Generate reference number
+      const count = await tx.collection.count({
+        where: { organizationId: ctx.organizationId },
+      });
+      const reference = `COLL-${String(count + 1).padStart(4, "0")}`;
+
+      // Create the collection
+      const collection = await tx.collection.create({
+        data: {
+          organizationId: ctx.organizationId,
+          customerId: ctx.customerId,
+          siteId: site.id,
+          routeDateId: routeDate.id,
+          reference,
+          bookingMode: "SCHEDULED",
+          collectionType: "STANDARD",
+          status: "REQUESTED",
+          requestedDate: routeDate.serviceDate,
+          scheduledDate: routeDate.serviceDate,
+          address: site.address || "",
+          postcode: site.postcode || "",
+          contactName: contactName || site.contactName,
+          contactPhone: contactPhone || site.contactPhone,
+          contactEmail: contactEmail || site.contactEmail,
+          equipmentCategories: equipmentCategories
+            ? equipmentCategories.split(",").map((c) => c.trim()).filter(Boolean)
+            : [],
+          itemEstimate,
+          customerInstructions,
+        },
+      });
+
+      // Record status change
+      await tx.collectionStatusChange.create({
+        data: {
+          collectionId: collection.id,
+          organizationId: ctx.organizationId,
+          fromStatus: null,
+          toStatus: "REQUESTED",
+          changedByUserId: ctx.userId,
+          notes: "Booked via customer portal",
+        },
+      });
+
+      return collection;
+    });
+
+    return {
+      success: true,
+      collectionId: result.id,
+      reference: result.reference,
+    };
+  } catch (error) {
+    console.error("Create portal booking error:", error);
+    return {
+      error: error instanceof Error ? error.message : "Failed to create booking",
+    };
+  }
+}
+
+export async function cancelPortalCollection(collectionId: string, reason: string) {
+  const ctx = await requireCustomerAccess();
+
+  const collection = await prisma.collection.findFirst({
+    where: {
+      id: collectionId,
+      customerId: ctx.customerId,
+      organizationId: ctx.organizationId,
+      status: { in: ["REQUESTED", "APPROVED", "SCHEDULED"] },
+    },
+  });
+
+  if (!collection) {
+    return { success: false, error: "Collection not found or cannot be cancelled" };
+  }
+
+  // Check if cancellation is allowed (e.g., not too close to scheduled date)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (collection.scheduledDate) {
+    const scheduledDate = new Date(collection.scheduledDate);
+    scheduledDate.setHours(0, 0, 0, 0);
+    const daysUntil = Math.ceil((scheduledDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysUntil < 1) {
+      return { success: false, error: "Cannot cancel collections less than 24 hours before scheduled date" };
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.collection.update({
+      where: { id: collectionId },
+      data: {
+        status: "CANCELLED",
+        cancelledAt: new Date(),
+      },
+    });
+
+    await tx.collectionStatusChange.create({
+      data: {
+        collectionId,
+        organizationId: ctx.organizationId,
+        fromStatus: collection.status,
+        toStatus: "CANCELLED",
+        changedByUserId: ctx.userId,
+        reason,
+        notes: "Cancelled by customer via portal",
+      },
+    });
+  });
+
+  return { success: true };
+}

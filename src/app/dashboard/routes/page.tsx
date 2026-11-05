@@ -1,20 +1,22 @@
 import { Calendar, MapPin, Users, TrendingUp, LayoutGrid, List } from "lucide-react";
 import Link from "next/link";
-import { requireMember } from "@/lib/access";
+import { requireMember, MANAGEMENT_ROLES } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SchedulingCalendar } from "./components/scheduling-calendar";
+import { RouteManagement, RouteRowActions } from "./components/route-management";
 
 interface SearchParams {
   view?: string;
 }
 
 export default async function Routes({ searchParams }: { searchParams: Promise<SearchParams> }) {
-  const { organizationId } = await requireMember();
+  const { organizationId, membership } = await requireMember();
   const params = await searchParams;
   const view = params.view || "calendar";
+  const isManager = MANAGEMENT_ROLES.includes(membership.role);
 
   const [routes, zones] = await Promise.all([
     prisma.routeDate.findMany({
@@ -44,6 +46,11 @@ export default async function Routes({ searchParams }: { searchParams: Promise<S
     }),
     prisma.collectionZone.findMany({
       where: { organizationId },
+      include: {
+        _count: {
+          select: { routeDates: true, sites: true },
+        },
+      },
       orderBy: { name: "asc" },
     }),
   ]);
@@ -59,7 +66,7 @@ export default async function Routes({ searchParams }: { searchParams: Promise<S
         title="Route Calendar"
         description="Published route dates and available booking capacity"
         actions={
-          <div style={{ display: "flex", gap: "0.5rem" }}>
+          <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", alignItems: "center" }}>
             <Link
               href="/dashboard/routes?view=calendar"
               className={`inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
@@ -82,6 +89,11 @@ export default async function Routes({ searchParams }: { searchParams: Promise<S
               <List className="w-4 h-4" />
               List
             </Link>
+            {isManager && (
+              <div style={{ marginLeft: "0.5rem" }}>
+                <RouteManagement zones={zones} routes={routes} />
+              </div>
+            )}
           </div>
         }
       />
@@ -124,7 +136,7 @@ export default async function Routes({ searchParams }: { searchParams: Promise<S
               <EmptyState
                 icon={Calendar}
                 title="No routes published"
-                description="Routes can be created through the admin panel or seed script."
+                description={isManager ? "Click 'Publish Route' to create your first collection date." : "No collection dates are currently available."}
               />
             ) : (
               <SchedulingCalendar routes={routes} zones={zones} />
@@ -141,7 +153,7 @@ export default async function Routes({ searchParams }: { searchParams: Promise<S
               <EmptyState
                 icon={Calendar}
                 title="No routes published"
-                description="Routes can be created through the admin panel or seed script."
+                description={isManager ? "Click 'Publish Route' to create your first collection date." : "No collection dates are currently available."}
               />
             ) : (
               <div style={{ overflowX: "auto" }}>
@@ -163,6 +175,7 @@ export default async function Routes({ searchParams }: { searchParams: Promise<S
                       <th>Bookings</th>
                       <th>Capacity</th>
                       <th>Availability</th>
+                      {isManager && <th>Actions</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -210,6 +223,11 @@ export default async function Routes({ searchParams }: { searchParams: Promise<S
                               </span>
                             )}
                           </td>
+                          {isManager && (
+                            <td>
+                              <RouteRowActions route={route} />
+                            </td>
+                          )}
                         </tr>
                       );
                     })}
