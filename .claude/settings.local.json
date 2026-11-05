@@ -53,7 +53,8 @@
       "Bash(DATABASE_URL=\"postgresql://dummy:dummy@localhost:5432/dummy\" npx prisma validate:*)",
       "Bash(export NODE_OPTIONS=\"--max-old-space-size=4096\")",
       "Bash(ls:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(git -C \"C:\\\\Users\\\\user\\\\Downloads\\\\ENCIF-RecyTrack-Phase1\" log --oneline --all)"
     ]
   }
 }
