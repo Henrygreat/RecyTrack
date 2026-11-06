@@ -240,6 +240,146 @@ export async function sendStaffInvitationEmail(params: {
   }
 }
 
+/**
+ * Send email verification email for customer registration
+ */
+export async function sendVerificationEmail(params: {
+  to: string;
+  name: string;
+  verificationToken: string;
+}): Promise<SendEmailResult> {
+  if (!isEmailConfigured()) {
+    return {
+      success: false,
+      error: "Email service not configured. Set RESEND_API_KEY environment variable.",
+    };
+  }
+
+  const { to, name, verificationToken } = params;
+  const verifyUrl = `${APP_URL}/verify-email?token=${verificationToken}`;
+
+  try {
+    const result = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: [to],
+      subject: "Verify your RecyTrack account",
+      html: generateVerificationEmailHtml({ name, verifyUrl }),
+      text: generateVerificationEmailText({ name, verifyUrl }),
+    });
+
+    if (result.error) {
+      return {
+        success: false,
+        error: result.error.message,
+      };
+    }
+
+    return {
+      success: true,
+      messageId: result.data?.id,
+    };
+  } catch (error) {
+    console.error("Failed to send verification email:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error sending email",
+    };
+  }
+}
+
+/**
+ * Send registration approved notification email
+ */
+export async function sendRegistrationApprovedEmail(params: {
+  to: string;
+  name: string;
+  companyName: string;
+}): Promise<SendEmailResult> {
+  if (!isEmailConfigured()) {
+    return {
+      success: false,
+      error: "Email service not configured.",
+    };
+  }
+
+  const { to, name, companyName } = params;
+  const loginUrl = `${APP_URL}/login`;
+
+  try {
+    const result = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: [to],
+      subject: "Your RecyTrack account has been approved",
+      html: generateApprovalEmailHtml({ name, companyName, loginUrl }),
+      text: generateApprovalEmailText({ name, companyName, loginUrl }),
+    });
+
+    if (result.error) {
+      return {
+        success: false,
+        error: result.error.message,
+      };
+    }
+
+    return {
+      success: true,
+      messageId: result.data?.id,
+    };
+  } catch (error) {
+    console.error("Failed to send approval email:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error sending email",
+    };
+  }
+}
+
+/**
+ * Send registration rejected notification email
+ */
+export async function sendRegistrationRejectedEmail(params: {
+  to: string;
+  name: string;
+  reason?: string;
+}): Promise<SendEmailResult> {
+  if (!isEmailConfigured()) {
+    return {
+      success: false,
+      error: "Email service not configured.",
+    };
+  }
+
+  const { to, name, reason } = params;
+
+  try {
+    const result = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: [to],
+      subject: "Update on your RecyTrack registration",
+      html: generateRejectionEmailHtml({ name, reason }),
+      text: generateRejectionEmailText({ name, reason }),
+    });
+
+    if (result.error) {
+      return {
+        success: false,
+        error: result.error.message,
+      };
+    }
+
+    return {
+      success: true,
+      messageId: result.data?.id,
+    };
+  } catch (error) {
+    console.error("Failed to send rejection email:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error sending email",
+    };
+  }
+}
+
 // ============================================
 // EMAIL TEMPLATES
 // ============================================
@@ -661,5 +801,371 @@ This invitation expires on ${expiryDate}. Please accept it before then.
 ---
 This email was sent by RecyTrack on behalf of ${organizationName}.
 If you didn't expect this invitation, you can safely ignore this email.
+`.trim();
+}
+
+// ============================================
+// VERIFICATION EMAIL TEMPLATES
+// ============================================
+
+function generateVerificationEmailHtml(params: {
+  name: string;
+  verifyUrl: string;
+}): string {
+  const { name, verifyUrl } = params;
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify your RecyTrack account</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <tr>
+      <td>
+        <!-- Header -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 32px;">
+          <tr>
+            <td style="text-align: center;">
+              <div style="display: inline-block; background-color: #0f766e; color: white; font-weight: 700; font-size: 24px; padding: 12px 24px; border-radius: 8px; letter-spacing: -0.5px;">
+                RecyTrack
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Main Content -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden;">
+          <tr>
+            <td style="padding: 40px;">
+              <h1 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 600; color: #0f172a; line-height: 1.3;">
+                Verify your email address
+              </h1>
+
+              <p style="margin: 0 0 24px 0; font-size: 16px; color: #475569; line-height: 1.6;">
+                Hello ${name},
+              </p>
+
+              <p style="margin: 0 0 24px 0; font-size: 16px; color: #475569; line-height: 1.6;">
+                Thank you for registering with RecyTrack. Please verify your email address to complete your registration.
+              </p>
+
+              <!-- CTA Button -->
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto 32px auto;">
+                <tr>
+                  <td style="border-radius: 8px; background-color: #0f766e;">
+                    <a href="${verifyUrl}" target="_blank" style="display: inline-block; padding: 16px 32px; font-size: 16px; font-weight: 600; color: white; text-decoration: none; border-radius: 8px;">
+                      Verify Email Address
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Link fallback -->
+              <p style="margin: 0 0 24px 0; font-size: 14px; color: #64748b; line-height: 1.6;">
+                Or copy and paste this link into your browser:
+              </p>
+              <p style="margin: 0 0 32px 0; font-size: 14px; color: #0f766e; word-break: break-all; background-color: #f8fafc; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                ${verifyUrl}
+              </p>
+
+              <!-- Info -->
+              <div style="padding: 16px; background-color: #f0fdfa; border-radius: 8px; border-left: 4px solid #0f766e;">
+                <p style="margin: 0 0 8px 0; font-size: 14px; color: #0f766e; font-weight: 600;">
+                  What happens next?
+                </p>
+                <p style="margin: 0; font-size: 14px; color: #475569;">
+                  After verifying your email, your registration will be reviewed by our team. You'll receive an email once your account is approved.
+                </p>
+              </div>
+
+              <!-- Expiry notice -->
+              <p style="margin: 24px 0 0 0; font-size: 14px; color: #64748b;">
+                This verification link will expire in 24 hours.
+              </p>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Footer -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top: 32px;">
+          <tr>
+            <td style="text-align: center;">
+              <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748b;">
+                This email was sent by RecyTrack.
+              </p>
+              <p style="margin: 0; font-size: 12px; color: #94a3b8;">
+                If you didn't create this account, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+}
+
+function generateVerificationEmailText(params: {
+  name: string;
+  verifyUrl: string;
+}): string {
+  const { name, verifyUrl } = params;
+
+  return `
+RecyTrack - Verify Your Email
+
+Hello ${name},
+
+Thank you for registering with RecyTrack. Please verify your email address to complete your registration.
+
+Click here to verify your email:
+${verifyUrl}
+
+What happens next?
+After verifying your email, your registration will be reviewed by our team. You'll receive an email once your account is approved.
+
+This verification link will expire in 24 hours.
+
+---
+This email was sent by RecyTrack.
+If you didn't create this account, you can safely ignore this email.
+`.trim();
+}
+
+// ============================================
+// APPROVAL/REJECTION EMAIL TEMPLATES
+// ============================================
+
+function generateApprovalEmailHtml(params: {
+  name: string;
+  companyName: string;
+  loginUrl: string;
+}): string {
+  const { name, companyName, loginUrl } = params;
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your RecyTrack account has been approved</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <tr>
+      <td>
+        <!-- Header -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 32px;">
+          <tr>
+            <td style="text-align: center;">
+              <div style="display: inline-block; background-color: #0f766e; color: white; font-weight: 700; font-size: 24px; padding: 12px 24px; border-radius: 8px; letter-spacing: -0.5px;">
+                RecyTrack
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Main Content -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden;">
+          <tr>
+            <td style="padding: 40px;">
+              <!-- Success Icon -->
+              <div style="text-align: center; margin-bottom: 24px;">
+                <div style="display: inline-block; width: 64px; height: 64px; background-color: #d1fae5; border-radius: 50%; line-height: 64px; font-size: 32px;">
+                  &#10003;
+                </div>
+              </div>
+
+              <h1 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 600; color: #0f172a; line-height: 1.3; text-align: center;">
+                Your account has been approved!
+              </h1>
+
+              <p style="margin: 0 0 24px 0; font-size: 16px; color: #475569; line-height: 1.6;">
+                Hello ${name},
+              </p>
+
+              <p style="margin: 0 0 24px 0; font-size: 16px; color: #475569; line-height: 1.6;">
+                Great news! Your registration for <strong>${companyName}</strong> on RecyTrack has been approved. You can now sign in to access the customer portal.
+              </p>
+
+              <!-- CTA Button -->
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto 32px auto;">
+                <tr>
+                  <td style="border-radius: 8px; background-color: #0f766e;">
+                    <a href="${loginUrl}" target="_blank" style="display: inline-block; padding: 16px 32px; font-size: 16px; font-weight: 600; color: white; text-decoration: none; border-radius: 8px;">
+                      Sign In to Your Portal
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Features -->
+              <div style="padding: 20px; background-color: #f8fafc; border-radius: 8px;">
+                <p style="margin: 0 0 12px 0; font-size: 14px; color: #0f172a; font-weight: 600;">
+                  What you can do:
+                </p>
+                <ul style="margin: 0; padding-left: 20px; color: #475569; font-size: 14px; line-height: 1.8;">
+                  <li>Book and manage IT asset collections</li>
+                  <li>Track your assets in real-time</li>
+                  <li>Download destruction certificates</li>
+                  <li>Access compliance reports</li>
+                </ul>
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Footer -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top: 32px;">
+          <tr>
+            <td style="text-align: center;">
+              <p style="margin: 0; font-size: 12px; color: #94a3b8;">
+                This email was sent by RecyTrack.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+}
+
+function generateApprovalEmailText(params: {
+  name: string;
+  companyName: string;
+  loginUrl: string;
+}): string {
+  const { name, companyName, loginUrl } = params;
+
+  return `
+RecyTrack - Your Account Has Been Approved
+
+Hello ${name},
+
+Great news! Your registration for ${companyName} on RecyTrack has been approved. You can now sign in to access the customer portal.
+
+Sign in here: ${loginUrl}
+
+What you can do:
+- Book and manage IT asset collections
+- Track your assets in real-time
+- Download destruction certificates
+- Access compliance reports
+
+---
+This email was sent by RecyTrack.
+`.trim();
+}
+
+function generateRejectionEmailHtml(params: {
+  name: string;
+  reason?: string;
+}): string {
+  const { name, reason } = params;
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Update on your RecyTrack registration</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+    <tr>
+      <td>
+        <!-- Header -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom: 32px;">
+          <tr>
+            <td style="text-align: center;">
+              <div style="display: inline-block; background-color: #0f766e; color: white; font-weight: 700; font-size: 24px; padding: 12px 24px; border-radius: 8px; letter-spacing: -0.5px;">
+                RecyTrack
+              </div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Main Content -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: white; border-radius: 12px; border: 1px solid #e2e8f0; overflow: hidden;">
+          <tr>
+            <td style="padding: 40px;">
+              <h1 style="margin: 0 0 16px 0; font-size: 24px; font-weight: 600; color: #0f172a; line-height: 1.3;">
+                Update on your registration
+              </h1>
+
+              <p style="margin: 0 0 24px 0; font-size: 16px; color: #475569; line-height: 1.6;">
+                Hello ${name},
+              </p>
+
+              <p style="margin: 0 0 24px 0; font-size: 16px; color: #475569; line-height: 1.6;">
+                Thank you for your interest in RecyTrack. After reviewing your registration, we are unable to approve your account at this time.
+              </p>
+
+              ${reason ? `
+              <div style="padding: 16px; background-color: #f8fafc; border-radius: 8px; margin-bottom: 24px;">
+                <p style="margin: 0 0 8px 0; font-size: 14px; color: #64748b; font-weight: 600;">
+                  Reason:
+                </p>
+                <p style="margin: 0; font-size: 14px; color: #0f172a;">
+                  ${reason}
+                </p>
+              </div>
+              ` : ""}
+
+              <p style="margin: 0; font-size: 16px; color: #475569; line-height: 1.6;">
+                If you believe this is an error or have questions, please contact our support team for assistance.
+              </p>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Footer -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top: 32px;">
+          <tr>
+            <td style="text-align: center;">
+              <p style="margin: 0; font-size: 12px; color: #94a3b8;">
+                This email was sent by RecyTrack.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+`;
+}
+
+function generateRejectionEmailText(params: {
+  name: string;
+  reason?: string;
+}): string {
+  const { name, reason } = params;
+
+  return `
+RecyTrack - Update on Your Registration
+
+Hello ${name},
+
+Thank you for your interest in RecyTrack. After reviewing your registration, we are unable to approve your account at this time.
+
+${reason ? `Reason: ${reason}` : ""}
+
+If you believe this is an error or have questions, please contact our support team for assistance.
+
+---
+This email was sent by RecyTrack.
 `.trim();
 }

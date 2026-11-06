@@ -22,6 +22,7 @@ import {
   QrCode,
   Award,
   AlertTriangle,
+  UserPlus,
 } from "lucide-react";
 
 interface NavItem {
@@ -80,6 +81,7 @@ const navigation: NavGroup[] = [
     items: [
       { label: "Settings", href: "/dashboard/settings", icon: Settings },
       { label: "Users", href: "/dashboard/users", icon: UserCog },
+      { label: "Registrations", href: "/dashboard/registrations", icon: UserPlus },
     ],
   },
 ];

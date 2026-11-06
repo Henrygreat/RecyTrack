@@ -550,6 +550,66 @@ model StaffInvitation {
 }
 
 // ============================================
+// CUSTOMER SELF-REGISTRATION (Phase 5.8)
+// ============================================
+
+enum RegistrationStatus {
+  PENDING_VERIFICATION // Email not yet verified
+  PENDING_APPROVAL // Email verified, awaiting admin approval
+  APPROVED // Approved by admin, customer created
+  REJECTED // Rejected by admin
+  EXPIRED // Verification token expired
+}
+
+model CustomerRegistration {
+  id String @id @default(cuid())
+
+  // Company information
+  companyName String
+  contactName String
+  email       String @unique // Must be unique across registrations
+
+  // Password (stored hashed)
+  passwordHash String
+
+  // Email verification
+  verificationToken   String    @unique
+  verificationExpires DateTime
+  emailVerifiedAt     DateTime?
+
+  // Registration status
+  status RegistrationStatus @default(PENDING_VERIFICATION)
+
+  // Admin approval
+  reviewedAt       DateTime?
+  reviewedByUserId String?
+  reviewedByName   String?
+  rejectionReason  String?
+
+  // Link to created customer (after approval)
+  createdCustomerId String?
+  createdUserId     String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Email delivery tracking
+  emailSentAt        DateTime?
+  emailMessageId     String?
+  emailDeliveredAt   DateTime?
+  emailFailedAt      DateTime?
+  emailFailureReason String?
+  lastResendAt       DateTime?
+  resendCount        Int       @default(0)
+
+  @@index([email])
+  @@index([verificationToken])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// ============================================
 // COLLECTION & LOGISTICS MODELS
 // ============================================
 
