@@ -1,5 +1,13 @@
 import Link from "next/link";
-import { Truck, MapPin, Calendar, Package, Filter } from "lucide-react";
+import {
+  Truck,
+  MapPin,
+  Calendar,
+  Package,
+  Filter,
+  Plus,
+  ChevronRight,
+} from "lucide-react";
 import { requireCustomerAccess } from "@/lib/portal-access";
 import { prisma } from "@/lib/prisma";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -14,8 +22,53 @@ interface PageProps {
 }
 
 const validStatuses: CollectionStatus[] = [
-  "DRAFT", "REQUESTED", "CONFIRMED", "APPROVED", "SCHEDULED", "ASSIGNED",
-  "IN_TRANSIT", "COLLECTED", "RECEIVED", "COMPLETED", "CANCELLED", "EXCEPTION"
+  "DRAFT",
+  "REQUESTED",
+  "CONFIRMED",
+  "APPROVED",
+  "SCHEDULED",
+  "ASSIGNED",
+  "IN_TRANSIT",
+  "COLLECTED",
+  "RECEIVED",
+  "COMPLETED",
+  "CANCELLED",
+  "EXCEPTION",
+];
+
+const statusColors: Record<
+  string,
+  { bg: string; text: string; label: string }
+> = {
+  DRAFT: { bg: "bg-slate-100", text: "text-slate-700", label: "Draft" },
+  REQUESTED: { bg: "bg-amber-100", text: "text-amber-700", label: "Requested" },
+  CONFIRMED: { bg: "bg-blue-100", text: "text-blue-700", label: "Confirmed" },
+  APPROVED: { bg: "bg-blue-100", text: "text-blue-700", label: "Approved" },
+  SCHEDULED: {
+    bg: "bg-indigo-100",
+    text: "text-indigo-700",
+    label: "Scheduled",
+  },
+  ASSIGNED: { bg: "bg-indigo-100", text: "text-indigo-700", label: "Assigned" },
+  IN_TRANSIT: { bg: "bg-teal-100", text: "text-teal-700", label: "In Transit" },
+  COLLECTED: {
+    bg: "bg-emerald-100",
+    text: "text-emerald-700",
+    label: "Collected",
+  },
+  RECEIVED: { bg: "bg-green-100", text: "text-green-700", label: "Received" },
+  COMPLETED: { bg: "bg-green-100", text: "text-green-700", label: "Completed" },
+  CANCELLED: { bg: "bg-red-100", text: "text-red-700", label: "Cancelled" },
+  EXCEPTION: { bg: "bg-red-100", text: "text-red-700", label: "Exception" },
+};
+
+const statusOptions = [
+  { value: "all", label: "All Status" },
+  { value: "REQUESTED", label: "Requested" },
+  { value: "APPROVED", label: "Approved" },
+  { value: "SCHEDULED", label: "Scheduled" },
+  { value: "IN_TRANSIT", label: "In Transit" },
+  { value: "COMPLETED", label: "Completed" },
 ];
 
 export default async function PortalCollections({ searchParams }: PageProps) {
@@ -47,70 +100,49 @@ export default async function PortalCollections({ searchParams }: PageProps) {
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
+      include: {
+        _count: {
+          select: { assets: true },
+        },
+      },
     }),
     prisma.collection.count({ where }),
   ]);
 
   const totalPages = Math.ceil(totalCount / limit);
 
-  const statusColors: Record<string, { bg: string; text: string; label: string }> = {
-    DRAFT: { bg: "#f1f5f9", text: "#64748b", label: "Draft" },
-    REQUESTED: { bg: "#fef3c7", text: "#b45309", label: "Requested" },
-    CONFIRMED: { bg: "#dbeafe", text: "#1e40af", label: "Confirmed" },  // Legacy status
-    APPROVED: { bg: "#dbeafe", text: "#1e40af", label: "Approved" },
-    SCHEDULED: { bg: "#e0e7ff", text: "#4338ca", label: "Scheduled" },
-    ASSIGNED: { bg: "#e0e7ff", text: "#4338ca", label: "Assigned" },
-    IN_TRANSIT: { bg: "#f0fdfa", text: "#0f766e", label: "In Transit" },
-    COLLECTED: { bg: "#d1fae5", text: "#065f46", label: "Collected" },
-    RECEIVED: { bg: "#dcfce7", text: "#166534", label: "Received" },
-    COMPLETED: { bg: "#dcfce7", text: "#166534", label: "Completed" },
-    CANCELLED: { bg: "#fef2f2", text: "#b91c1c", label: "Cancelled" },
-    EXCEPTION: { bg: "#fef2f2", text: "#b91c1c", label: "Exception" },
-  };
-
-  const statusOptions = [
-    { value: "all", label: "All Status" },
-    { value: "REQUESTED", label: "Requested" },
-    { value: "APPROVED", label: "Approved" },
-    { value: "SCHEDULED", label: "Scheduled" },
-    { value: "IN_TRANSIT", label: "In Transit" },
-    { value: "COMPLETED", label: "Completed" },
-  ];
-
   return (
-    <>
-      <div style={{ marginBottom: "1.5rem" }}>
-        <h1 style={{ fontSize: "1.5rem", fontWeight: "600", color: "#0f172a", margin: 0 }}>
-          Collections
-        </h1>
-        <p style={{ color: "#64748b", marginTop: "0.25rem" }}>
-          Track and view your IT recycling collections
-        </p>
+    <div className="space-y-6">
+      {/* Header with Book CTA */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Collections</h1>
+          <p className="text-slate-500 mt-1">
+            Track and view your IT recycling collections
+          </p>
+        </div>
+        <Link
+          href="/portal/book"
+          className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
+        >
+          <Plus className="h-4 w-4" />
+          Book a Collection
+        </Link>
       </div>
 
       {/* Filters */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "1rem",
-          marginBottom: "1.5rem",
-        }}
-      >
+      <div className="flex items-center gap-4">
         <Filter className="w-4 h-4 text-slate-400" />
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+        <div className="flex gap-2 flex-wrap">
           {statusOptions.map((opt) => (
             <Link
               key={opt.value}
               href={`/portal/collections${opt.value !== "all" ? `?status=${opt.value}` : ""}`}
-              style={{
-                padding: "0.375rem 0.75rem",
-                borderRadius: "9999px",
-                fontSize: "0.875rem",
-                textDecoration: "none",
-                backgroundColor: status === opt.value ? "#0f766e" : "#f1f5f9",
-                color: status === opt.value ? "white" : "#64748b",
-              }}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                status === opt.value
+                  ? "bg-teal-600 text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
             >
               {opt.label}
             </Link>
@@ -121,7 +153,10 @@ export default async function PortalCollections({ searchParams }: PageProps) {
       <Card>
         <CardHeader>
           <CardTitle>
-            {status === "all" ? "All Collections" : statusColors[status]?.label || status} ({totalCount})
+            {status === "all"
+              ? "All Collections"
+              : statusColors[status]?.label || status}{" "}
+            ({totalCount})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -134,135 +169,101 @@ export default async function PortalCollections({ searchParams }: PageProps) {
                   ? "Try changing your filter to see more collections."
                   : "Your collection history will appear here."
               }
+              action={
+                status === "all"
+                  ? { label: "Book your first collection", href: "/portal/book" }
+                  : undefined
+              }
             />
           ) : (
             <>
-              <div style={{ display: "grid", gap: "0.75rem" }}>
+              <div className="space-y-3">
                 {collections.map((collection) => {
                   const colors = statusColors[collection.status] || {
-                    bg: "#f1f5f9",
-                    text: "#64748b",
+                    bg: "bg-slate-100",
+                    text: "text-slate-700",
                     label: collection.status,
                   };
                   return (
-                    <div
+                    <Link
                       key={collection.id}
-                      style={{
-                        padding: "1rem",
-                        backgroundColor: "#f8fafc",
-                        borderRadius: "0.5rem",
-                        border: "1px solid #e2e8f0",
-                      }}
+                      href={`/portal/collections/${collection.id}`}
+                      className="block p-4 bg-slate-50 rounded-lg border border-slate-200 hover:border-teal-300 hover:bg-slate-100 transition-all group"
                     >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
-                          flexWrap: "wrap",
-                          gap: "0.5rem",
-                        }}
-                      >
-                        <div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                            <span
-                              className="font-mono"
-                              style={{ fontWeight: "600", fontSize: "0.875rem" }}
-                            >
+                      <div className="flex justify-between items-start flex-wrap gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="font-mono text-sm font-semibold text-slate-900">
                               {collection.reference}
                             </span>
                             <span
-                              className="badge"
-                              style={{ backgroundColor: colors.bg, color: colors.text }}
+                              className={`px-2 py-0.5 text-xs font-medium rounded-full ${colors.bg} ${colors.text}`}
                             >
                               {colors.label}
                             </span>
                           </div>
-                          <p
-                            style={{
-                              marginTop: "0.5rem",
-                              fontSize: "0.875rem",
-                              color: "#475569",
-                            }}
-                          >
+                          <p className="text-sm text-slate-600 mb-2">
                             {collection.address}
                           </p>
-                          <div
-                            style={{
-                              display: "flex",
-                              flexWrap: "wrap",
-                              gap: "1rem",
-                              marginTop: "0.5rem",
-                              fontSize: "0.75rem",
-                              color: "#64748b",
-                            }}
-                          >
-                            <span style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                          <div className="flex flex-wrap gap-4 text-xs text-slate-500">
+                            <span className="flex items-center gap-1">
                               <MapPin className="w-3 h-3" />
                               {collection.postcode}
                             </span>
-                            <span style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                            <span className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
-                              Booked: {collection.createdAt.toLocaleDateString("en-GB")}
+                              {collection.scheduledDate
+                                ? new Date(
+                                    collection.scheduledDate
+                                  ).toLocaleDateString("en-GB", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                  })
+                                : "Pending"}
                             </span>
-                            <span style={{ display: "flex", alignItems: "center", gap: "0.25rem" }}>
+                            <span className="flex items-center gap-1">
                               <Package className="w-3 h-3" />
-                              ~{collection.itemEstimate} items
+                              {collection._count.assets > 0
+                                ? `${collection._count.assets} assets`
+                                : `~${collection.itemEstimate} estimated`}
                             </span>
                           </div>
                         </div>
-                        {collection.collectedAt && (
-                          <div style={{ textAlign: "right", fontSize: "0.75rem", color: "#64748b" }}>
-                            <div>Collected</div>
-                            <div style={{ fontWeight: "500" }}>
-                              {collection.collectedAt.toLocaleDateString("en-GB")}
+                        <div className="flex items-center gap-2">
+                          {collection.collectedAt && (
+                            <div className="text-right text-xs text-slate-500">
+                              <div>Collected</div>
+                              <div className="font-medium">
+                                {new Date(
+                                  collection.collectedAt
+                                ).toLocaleDateString("en-GB")}
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
+                          <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-teal-600 transition-colors" />
+                        </div>
                       </div>
-                      {collection.notes && (
-                        <p
-                          style={{
-                            marginTop: "0.75rem",
-                            padding: "0.5rem",
-                            backgroundColor: "#f1f5f9",
-                            borderRadius: "0.375rem",
-                            fontSize: "0.75rem",
-                            color: "#64748b",
-                          }}
-                        >
-                          {collection.notes}
-                        </p>
-                      )}
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
 
               {/* Pagination */}
               {totalPages > 1 && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginTop: "1rem",
-                    paddingTop: "1rem",
-                    borderTop: "1px solid #e2e8f0",
-                  }}
-                >
+                <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-200">
                   <span className="text-sm text-slate-600">
-                    Showing {skip + 1} to {Math.min(skip + limit, totalCount)} of {totalCount}
+                    Showing {skip + 1} to {Math.min(skip + limit, totalCount)}{" "}
+                    of {totalCount}
                   </span>
-                  <div style={{ display: "flex", gap: "0.5rem" }}>
+                  <div className="flex gap-2">
                     {page > 1 && (
                       <Link
                         href={`/portal/collections?${new URLSearchParams({
                           ...(status !== "all" && { status }),
                           page: String(page - 1),
                         })}`}
-                        className="btn btn-secondary"
-                        style={{ padding: "0.5rem 1rem" }}
+                        className="px-4 py-2 text-sm font-medium border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
                       >
                         Previous
                       </Link>
@@ -273,8 +274,7 @@ export default async function PortalCollections({ searchParams }: PageProps) {
                           ...(status !== "all" && { status }),
                           page: String(page + 1),
                         })}`}
-                        className="btn btn-secondary"
-                        style={{ padding: "0.5rem 1rem" }}
+                        className="px-4 py-2 text-sm font-medium border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
                       >
                         Next
                       </Link>
@@ -286,6 +286,6 @@ export default async function PortalCollections({ searchParams }: PageProps) {
           )}
         </CardContent>
       </Card>
-    </>
+    </div>
   );
 }

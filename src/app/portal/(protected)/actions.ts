@@ -1080,3 +1080,127 @@ export async function cancelPortalCollection(collectionId: string, reason: strin
 
   return { success: true };
 }
+
+// ============================================
+// COLLECTION DETAILS
+// ============================================
+
+export async function getPortalCollectionDetail(collectionId: string) {
+  const ctx = await requireCustomerAccess();
+
+  const collection = await prisma.collection.findFirst({
+    where: {
+      id: collectionId,
+      customerId: ctx.customerId,
+      organizationId: ctx.organizationId,
+    },
+    select: {
+      id: true,
+      reference: true,
+      status: true,
+      bookingMode: true,
+      collectionType: true,
+      address: true,
+      postcode: true,
+      requestedDate: true,
+      scheduledDate: true,
+      collectedAt: true,
+      receivedAt: true,
+      completedAt: true,
+      cancelledAt: true,
+      itemEstimate: true,
+      contactName: true,
+      contactPhone: true,
+      contactEmail: true,
+      equipmentCategories: true,
+      customerInstructions: true,
+      createdAt: true,
+      site: {
+        select: {
+          id: true,
+          name: true,
+          reference: true,
+        },
+      },
+      // Get assets associated with this collection
+      assets: {
+        select: {
+          id: true,
+          assetTag: true,
+          customerAssetTag: true,
+          category: true,
+          manufacturer: true,
+          model: true,
+          status: true,
+          storageMedia: {
+            select: {
+              id: true,
+              sanitisationStatus: true,
+            },
+          },
+        },
+        orderBy: { assetTag: "asc" },
+        take: 50, // Limit for performance
+      },
+      // Get status history for timeline (customer-visible only)
+      statusHistory: {
+        select: {
+          id: true,
+          fromStatus: true,
+          toStatus: true,
+          createdAt: true,
+          // Note: We explicitly exclude internal notes
+        },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
+
+  if (!collection) {
+    return { success: false, error: "Collection not found" };
+  }
+
+  // Get certificates associated with assets from this collection
+  const certificates = await prisma.certificate.findMany({
+    where: {
+      organizationId: ctx.organizationId,
+      customerId: ctx.customerId,
+      status: "ISSUED",
+      items: {
+        some: {
+          storageMedia: {
+            asset: {
+              collectionId: collection.id,
+            },
+          },
+        },
+      },
+    },
+    select: {
+      id: true,
+      certificateNumber: true,
+      certificateType: true,
+      issueDate: true,
+      totalMediaCount: true,
+    },
+    orderBy: { issueDate: "desc" },
+    take: 10,
+  });
+
+  // Count total assets
+  const assetCount = await prisma.asset.count({
+    where: {
+      collectionId: collection.id,
+      organizationId: ctx.organizationId,
+    },
+  });
+
+  return {
+    success: true,
+    collection: {
+      ...collection,
+      totalAssetCount: assetCount,
+      certificates,
+    },
+  };
+}
