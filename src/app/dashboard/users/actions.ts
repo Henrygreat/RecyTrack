@@ -7,6 +7,7 @@ import { z } from "zod";
 import { Role } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { sendStaffInvitationEmail, isEmailConfigured } from "@/lib/email";
+import { checkInvitationRateLimit } from "@/lib/rate-limit";
 
 import { ROLE_HIERARCHY } from "./constants";
 
@@ -396,6 +397,14 @@ export async function resendStaffInvitation(invitationId: string): Promise<Actio
 
     if (!invitation) {
       return { error: "Invitation not found or already accepted/revoked" };
+    }
+
+    // Check rate limit for invitation resends
+    const rateLimit = await checkInvitationRateLimit(invitation.email);
+    if (!rateLimit.success) {
+      return {
+        error: `Too many resend attempts. Please wait ${rateLimit.retryAfterSeconds} seconds.`,
+      };
     }
 
     // Generate new token and extend expiry

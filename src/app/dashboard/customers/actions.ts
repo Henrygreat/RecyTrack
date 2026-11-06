@@ -16,6 +16,7 @@ import { redirect } from "next/navigation";
 import { randomBytes } from "node:crypto";
 import type { CustomerStatus } from "@prisma/client";
 import { sendInvitationEmail, isEmailConfigured } from "@/lib/email";
+import { checkInvitationRateLimit } from "@/lib/rate-limit";
 
 // ============================================
 // HELPER FUNCTIONS
@@ -912,6 +913,14 @@ export async function resendInvitation(invitationId: string): Promise<Invitation
 
     if (invitation.expiresAt < new Date()) {
       return { error: "Invitation has expired. Please create a new invitation." };
+    }
+
+    // Check rate limit for invitation resends
+    const rateLimit = await checkInvitationRateLimit(invitation.email);
+    if (!rateLimit.success) {
+      return {
+        error: `Too many resend attempts. Please wait ${rateLimit.retryAfterSeconds} seconds.`,
+      };
     }
 
     if (!isEmailConfigured()) {

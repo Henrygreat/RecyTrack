@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { checkApiRateLimit, getRateLimitHeaders } from "@/lib/rate-limit";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -9,6 +10,15 @@ export async function GET(request: NextRequest) {
   }
 
   const userId = session.user.id;
+
+  // Check rate limit
+  const rateLimit = await checkApiRateLimit(userId);
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: getRateLimitHeaders(rateLimit) }
+    );
+  }
 
   // Get user's organization through membership
   const membership = await prisma.membership.findFirst({
@@ -64,6 +74,15 @@ export async function PATCH(request: NextRequest) {
   }
 
   const userId = session.user.id;
+
+  // Check rate limit
+  const rateLimit = await checkApiRateLimit(userId);
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      { status: 429, headers: getRateLimitHeaders(rateLimit) }
+    );
+  }
 
   try {
     const body = await request.json();

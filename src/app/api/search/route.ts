@@ -1,8 +1,7 @@
-"use server";
-
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { checkSearchRateLimit, getRateLimitHeaders } from "@/lib/rate-limit";
 
 export interface SearchResult {
   id: string;
@@ -22,6 +21,18 @@ export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Check rate limit
+  const rateLimit = await checkSearchRateLimit(session.user.id);
+  if (!rateLimit.success) {
+    return NextResponse.json(
+      { error: "Too many requests. Please slow down." },
+      {
+        status: 429,
+        headers: getRateLimitHeaders(rateLimit),
+      }
+    );
   }
 
   // Get user's organization through membership

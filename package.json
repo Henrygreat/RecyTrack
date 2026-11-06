@@ -30,6 +30,7 @@
     "postcss": "^8.5.31",
     "prisma": "6.19.3",
     "qrcode": "^1.5.4",
+    "rate-limiter-flexible": "^11.3.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "recharts": "^3.10.1",
