@@ -249,6 +249,7 @@ model User {
   name                   String?
   email                  String               @unique
   passwordHash           String
+  passwordVersion        Int                  @default(1) // Incremented on password change to invalidate JWT sessions
   createdAt              DateTime             @default(now())
   lastLoginAt            DateTime?
   lastActiveAt           DateTime?
@@ -258,6 +259,7 @@ model User {
   staffInvitationsSent   StaffInvitation[]    @relation("StaffInvitedBy")
   deactivatedMemberships Membership[]         @relation("DeactivatedBy")
   notifications          Notification[]
+  passwordResetTokens    PasswordResetToken[]
 }
 
 model Organization {
@@ -607,6 +609,29 @@ model CustomerRegistration {
   @@index([verificationToken])
   @@index([status])
   @@index([createdAt])
+}
+
+// ============================================
+// PASSWORD RESET TOKENS
+// ============================================
+
+/// Secure password reset tokens for account recovery.
+/// Tokens are stored as cryptographic hashes (SHA-256).
+/// Each user can have at most one valid token at a time.
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique // SHA-256 hash of the token (never store raw token)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  usedAt    DateTime? // Set when token is consumed
+  ipAddress String?  // IP that requested the reset (for audit)
+  userAgent String?  // User agent that requested the reset (for audit)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 // ============================================
