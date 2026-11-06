@@ -1,15 +1,31 @@
 "use client";
 
-import { Bell, Search, User, Menu } from "lucide-react";
+import { Menu, Search } from "lucide-react";
+import { GlobalSearch } from "./global-search";
+import { NotificationBell } from "./notification-bell";
+import { UserProfileMenu } from "./user-profile-menu";
 
 interface HeaderProps {
   onMenuClick?: () => void;
   showMenuButton?: boolean;
+  userName: string | null;
+  userEmail: string;
+  organizationName: string;
+  userRole: string;
+  onSignOut: () => void;
 }
 
-export function Header({ onMenuClick, showMenuButton = false }: HeaderProps) {
+export function Header({
+  onMenuClick,
+  showMenuButton = false,
+  userName,
+  userEmail,
+  organizationName,
+  userRole,
+  onSignOut,
+}: HeaderProps) {
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 sm:px-6">
       <div className="flex items-center gap-4">
         {showMenuButton && (
           <button
@@ -20,38 +36,34 @@ export function Header({ onMenuClick, showMenuButton = false }: HeaderProps) {
             <Menu className="w-5 h-5 text-slate-600" />
           </button>
         )}
-        {/* Search */}
-        <div className="relative hidden sm:block">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search..."
-            disabled
-            className="w-64 pl-10 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
-          />
-        </div>
+
+        {/* Global Search */}
+        <GlobalSearch />
+
+        {/* Mobile search button */}
+        <button
+          className="p-2 rounded-lg hover:bg-slate-100 transition-colors sm:hidden"
+          aria-label="Search"
+          onClick={() => {
+            // Could open a mobile search modal in the future
+          }}
+        >
+          <Search className="w-5 h-5 text-slate-600" />
+        </button>
       </div>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 sm:gap-2">
         {/* Notifications */}
-        <button
-          disabled
-          className="relative p-2 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          aria-label="Notifications"
-        >
-          <Bell className="w-5 h-5 text-slate-600" />
-        </button>
+        <NotificationBell />
 
         {/* User menu */}
-        <button
-          disabled
-          className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          aria-label="User menu"
-        >
-          <div className="w-8 h-8 bg-teal-100 rounded-full flex items-center justify-center">
-            <User className="w-4 h-4 text-teal-600" />
-          </div>
-        </button>
+        <UserProfileMenu
+          userName={userName}
+          userEmail={userEmail}
+          organizationName={organizationName}
+          userRole={userRole}
+          onSignOut={onSignOut}
+        />
       </div>
     </header>
   );

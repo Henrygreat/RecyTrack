@@ -257,6 +257,7 @@ model User {
   invitationsSent        CustomerInvitation[] @relation("InvitedBy")
   staffInvitationsSent   StaffInvitation[]    @relation("StaffInvitedBy")
   deactivatedMemberships Membership[]         @relation("DeactivatedBy")
+  notifications          Notification[]
 }
 
 model Organization {
@@ -324,6 +325,8 @@ model Organization {
   complianceEvidence   ComplianceEvidence[]
   // Phase 5.6: Document Management
   documents            Document[]
+  // User Notifications
+  userNotifications    Notification[]        @relation("OrgNotifications")
 }
 
 model Membership {
@@ -2373,6 +2376,54 @@ model ComplianceEvidence {
   @@index([destructionJobId])
   @@index([certificateId])
   @@index([auditId])
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+enum NotificationType {
+  COLLECTION_BOOKING // New collection booking received
+  COLLECTION_APPROVED // Collection approved
+  COLLECTION_ASSIGNED // Driver assigned to collection
+  COLLECTION_STATUS // Collection status change
+  ROUTE_CHANGE // Route schedule change
+  CUSTOMER_REQUEST // Customer made a request
+  ERASURE_COMPLETE // Data erasure completed
+  DESTRUCTION_COMPLETE // Physical destruction completed
+  COMPLIANCE_EXCEPTION // Compliance exception raised
+  APPROVAL_REQUIRED // Approval needed
+  CERTIFICATE_ISSUED // Certificate issued
+  USER_INVITED // New user invited
+  SYSTEM // System notification
+}
+
+model Notification {
+  id             String           @id @default(cuid())
+  organizationId String
+  userId         String // Recipient user
+  type           NotificationType
+  title          String
+  message        String
+  isRead         Boolean          @default(false)
+  readAt         DateTime?
+
+  // Link to related record
+  entityType String? // e.g. "Collection", "Asset", "Certificate"
+  entityId   String? // ID of related record
+  actionUrl  String? // URL to navigate to
+
+  // Metadata
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  organization Organization @relation("OrgNotifications", fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([organizationId, createdAt])
+  @@index([userId, createdAt])
 }
 
 // ============================================

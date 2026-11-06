@@ -7,10 +7,20 @@ import { Header } from "./header";
 interface AppShellProps {
   children: React.ReactNode;
   organizationName: string;
+  userName: string | null;
+  userEmail: string;
+  userRole: string;
   onSignOut: () => void;
 }
 
-export function AppShell({ children, organizationName, onSignOut }: AppShellProps) {
+export function AppShell({
+  children,
+  organizationName,
+  userName,
+  userEmail,
+  userRole,
+  onSignOut,
+}: AppShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -43,6 +53,11 @@ export function AppShell({ children, organizationName, onSignOut }: AppShellProp
         <Header
           showMenuButton
           onMenuClick={() => setMobileOpen(!mobileOpen)}
+          userName={userName}
+          userEmail={userEmail}
+          organizationName={organizationName}
+          userRole={userRole}
+          onSignOut={onSignOut}
         />
         <main className="p-6">{children}</main>
       </div>
