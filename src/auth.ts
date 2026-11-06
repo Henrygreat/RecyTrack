@@ -141,25 +141,63 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           });
 
         // Return user object for session
+        // Include passwordVersion for session invalidation on password reset
         return {
           id: user.id,
           email: user.email,
           name: user.name,
+          passwordVersion: user.passwordVersion,
         };
       },
     }),
   ],
 
   callbacks: {
-    // Include user ID in the JWT token
-    jwt({ token, user }) {
+    // Include user ID and passwordVersion in the JWT token
+    async jwt({ token, user, trigger }) {
+      // On initial sign-in, store user data including passwordVersion
       if (user?.id) {
         token.id = user.id;
+        token.passwordVersion = (user as { passwordVersion?: number }).passwordVersion ?? 1;
       }
+
+      // On subsequent requests, validate passwordVersion hasn't changed
+      // This invalidates sessions after password reset
+      if (trigger === "update" || (token.id && !user)) {
+        // Only check periodically to avoid database load (every 5 minutes)
+        const lastChecked = token.passwordVersionCheckedAt as number | undefined;
+        const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+
+        if (!lastChecked || lastChecked < fiveMinutesAgo) {
+          try {
+            const currentUser = await prisma.user.findUnique({
+              where: { id: token.id as string },
+              select: { passwordVersion: true },
+            });
+
+            if (currentUser) {
+              // If passwordVersion has changed, invalidate session by returning empty token
+              if (currentUser.passwordVersion !== token.passwordVersion) {
+                console.log(`Session invalidated for user ${token.id}: password version changed`);
+                return {} as typeof token;
+              }
+              token.passwordVersionCheckedAt = Date.now();
+            }
+          } catch (error) {
+            // On database error, allow request to continue but log
+            console.error("Error validating password version:", error);
+          }
+        }
+      }
+
       return token;
     },
     // Include user ID in the session
     session({ session, token }) {
+      // If token was invalidated (empty), return null session
+      if (!token.id) {
+        return { ...session, user: undefined };
+      }
       if (token.id && session.user) {
         session.user.id = token.id as string;
       }
