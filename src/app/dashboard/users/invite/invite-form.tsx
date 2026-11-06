@@ -5,27 +5,12 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Mail, User, Shield, Loader2, CheckCircle } from "lucide-react";
 import { Role } from "@prisma/client";
-import { inviteStaffMember, ASSIGNABLE_STAFF_ROLES, ROLE_LABELS, type ActionState } from "../actions";
+import { inviteStaffMember, type ActionState } from "../actions";
+import { ASSIGNABLE_STAFF_ROLES, ROLE_LABELS, ROLE_HIERARCHY, ROLE_DESCRIPTIONS } from "../constants";
 
 interface InviteStaffFormProps {
   currentUserRole: Role;
 }
-
-const ROLE_HIERARCHY: Record<Role, number> = {
-  OWNER: 100,
-  ADMIN: 80,
-  OPERATIONS: 60,
-  WAREHOUSE: 40,
-  DRIVER: 20,
-  CUSTOMER: 0,
-};
-
-const ROLE_DESCRIPTIONS: Record<string, string> = {
-  ADMIN: "Full access to all features including user management and settings",
-  OPERATIONS: "Manage collections, customers, routes, and daily operations",
-  WAREHOUSE: "Process assets, run inspections, manage warehouse inventory",
-  DRIVER: "View and update assigned collections, scan assets",
-};
 
 export function InviteStaffForm({ currentUserRole }: InviteStaffFormProps) {
   const router = useRouter();

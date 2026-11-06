@@ -12,7 +12,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { Role } from "@prisma/client";
-import { deactivateUser, reactivateUser, updateUserRole, ASSIGNABLE_STAFF_ROLES, ROLE_LABELS } from "../actions";
+import { deactivateUser, reactivateUser, updateUserRole } from "../actions";
+import { ASSIGNABLE_STAFF_ROLES, ROLE_LABELS, ROLE_HIERARCHY } from "../constants";
 
 interface UserRowActionsProps {
   userId: string;
@@ -22,15 +23,6 @@ interface UserRowActionsProps {
   currentUserRole: Role;
   isActive: boolean;
 }
-
-const ROLE_HIERARCHY: Record<Role, number> = {
-  OWNER: 100,
-  ADMIN: 80,
-  OPERATIONS: 60,
-  WAREHOUSE: 40,
-  DRIVER: 20,
-  CUSTOMER: 0,
-};
 
 export function UserRowActions({
   userId,

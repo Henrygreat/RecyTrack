@@ -8,31 +8,10 @@ import { Role } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { sendStaffInvitationEmail, isEmailConfigured } from "@/lib/email";
 
+import { ROLE_HIERARCHY } from "./constants";
+
 // Only OWNER and ADMIN can manage users
 const ADMIN_ROLES: Role[] = ["OWNER", "ADMIN"];
-
-// Role hierarchy - users can only assign roles at or below their level
-const ROLE_HIERARCHY: Record<Role, number> = {
-  OWNER: 100,
-  ADMIN: 80,
-  OPERATIONS: 60,
-  WAREHOUSE: 40,
-  DRIVER: 20,
-  CUSTOMER: 0, // Not assignable via staff management
-};
-
-// Human-readable role labels
-export const ROLE_LABELS: Record<Role, string> = {
-  OWNER: "Owner",
-  ADMIN: "Administrator",
-  OPERATIONS: "Operations Manager",
-  WAREHOUSE: "Warehouse Staff",
-  DRIVER: "Driver",
-  CUSTOMER: "Customer",
-};
-
-// Roles that can be assigned to staff
-export const ASSIGNABLE_STAFF_ROLES: Role[] = ["ADMIN", "OPERATIONS", "WAREHOUSE", "DRIVER"];
 
 // ============================================
 // TYPES
