@@ -1,7 +1,9 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { requireCustomerAccess, type CustomerPortalContext } from "@/lib/portal-access";
+import { canAccessSite, requireCustomerAccess } from "@/lib/portal-access";
+import { portalSiteSchema } from "@/lib/validation";
+import { revalidatePath } from "next/cache";
 import type { AssetStatus, MediaSanitisationStatus, CollectionStatus, CertificateType, CertificateStatus } from "@prisma/client";
 
 // ============================================
@@ -799,6 +801,8 @@ export async function getCustomerSites() {
   const sites = await prisma.site.findMany({
     where: {
       customerId: ctx.customerId,
+      organizationId: ctx.organizationId,
+      isActive: true,
       ...(ctx.authorizedSiteIds ? { id: { in: ctx.authorizedSiteIds } } : {}),
     },
     select: {
@@ -825,6 +829,8 @@ export async function getAvailableBookingDates(siteId: string) {
     where: {
       id: siteId,
       customerId: ctx.customerId,
+      organizationId: ctx.organizationId,
+      isActive: true,
       ...(ctx.authorizedSiteIds ? { id: { in: ctx.authorizedSiteIds } } : {}),
     },
     select: {
@@ -928,6 +934,8 @@ export async function createPortalBooking(
       where: {
         id: siteId,
         customerId: ctx.customerId,
+        organizationId: ctx.organizationId,
+        isActive: true,
         ...(ctx.authorizedSiteIds ? { id: { in: ctx.authorizedSiteIds } } : {}),
       },
     });
@@ -1203,4 +1211,469 @@ export async function getPortalCollectionDetail(collectionId: string) {
       certificates,
     },
   };
+}
+
+// ============================================
+// SITE MANAGEMENT
+// ============================================
+
+export async function getPortalSites() {
+  const ctx = await requireCustomerAccess();
+
+  const sites = await prisma.site.findMany({
+    where: {
+      customerId: ctx.customerId,
+      organizationId: ctx.organizationId,
+      ...(ctx.authorizedSiteIds ? { id: { in: ctx.authorizedSiteIds } } : {}),
+    },
+    include: {
+      zone: { select: { name: true } },
+      _count: { select: { collections: true } },
+    },
+    orderBy: [{ isDefault: "desc" }, { name: "asc" }],
+  });
+
+  return { success: true, sites };
+}
+
+export async function getPortalSiteDetail(siteId: string) {
+  const ctx = await requireCustomerAccess();
+
+  // Verify access to this site
+  if (ctx.authorizedSiteIds && !ctx.authorizedSiteIds.includes(siteId)) {
+    return { success: false, error: "Access denied" };
+  }
+
+  const site = await prisma.site.findFirst({
+    where: {
+      id: siteId,
+      customerId: ctx.customerId,
+      organizationId: ctx.organizationId,
+    },
+    include: {
+      zone: { select: { id: true, name: true } },
+      contacts: {
+        where: { isActive: true },
+        orderBy: [{ isPrimary: "desc" }, { name: "asc" }],
+      },
+    },
+  });
+
+  if (!site) {
+    return { success: false, error: "Site not found" };
+  }
+
+  // Get recent collections for this site
+  const recentCollections = await prisma.collection.findMany({
+    where: {
+      siteId: site.id,
+      customerId: ctx.customerId,
+      organizationId: ctx.organizationId,
+    },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+    select: {
+      id: true,
+      reference: true,
+      status: true,
+      scheduledDate: true,
+      collectedAt: true,
+      _count: { select: { assets: true } },
+    },
+  });
+
+  // Get collection stats
+  const collectionStats = await prisma.collection.groupBy({
+    by: ["status"],
+    where: {
+      siteId: site.id,
+      customerId: ctx.customerId,
+      organizationId: ctx.organizationId,
+    },
+    _count: true,
+  });
+
+  return {
+    success: true,
+    site,
+    canManageSite: ctx.isAdmin && canAccessSite(ctx, siteId),
+    recentCollections,
+    collectionStats: collectionStats.reduce(
+      (acc, s) => ({ ...acc, [s.status]: s._count }),
+      {} as Record<string, number>
+    ),
+  };
+}
+
+export type SiteFormState = {
+  success?: boolean;
+  error?: string;
+  fieldErrors?: Record<string, string>;
+  siteId?: string;
+};
+
+export async function createPortalSite(
+  _prevState: SiteFormState,
+  formData: FormData
+): Promise<SiteFormState> {
+  const ctx = await requireCustomerAccess();
+
+  if (!ctx.isAdmin || ctx.authorizedSiteIds !== null) {
+    return { error: "Only customer administrators with full site access can create sites" };
+  }
+
+  const parsed = portalSiteSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      if (issue.path[0]) fieldErrors[String(issue.path[0])] = issue.message;
+    }
+    return { error: "Please check the site details.", fieldErrors };
+  }
+
+  try {
+    const data = parsed.data;
+    const count = await prisma.site.count({
+      where: { organizationId: ctx.organizationId },
+    });
+    const reference = `SITE-${String(count + 1).padStart(4, "0")}`;
+    const zone = await prisma.collectionZone.findFirst({
+      where: {
+        organizationId: ctx.organizationId,
+        postcodePrefixes: { has: data.postcode.split(" ")[0]?.toUpperCase() || "" },
+      },
+      select: { id: true },
+    });
+
+    const site = await prisma.$transaction(async (tx) => {
+      if (data.isDefault) {
+        await tx.site.updateMany({
+          where: {
+            customerId: ctx.customerId,
+            organizationId: ctx.organizationId,
+            isDefault: true,
+          },
+          data: { isDefault: false },
+        });
+      }
+
+      const created = await tx.site.create({
+        data: {
+          organizationId: ctx.organizationId,
+          customerId: ctx.customerId,
+          reference,
+          name: data.name,
+          address: data.address,
+          postcode: data.postcode.toUpperCase(),
+          contactName: data.contactName || null,
+          contactPhone: data.contactPhone || null,
+          contactEmail: data.contactEmail || null,
+          collectionInstructions: data.collectionInstructions || null,
+          openingHours: data.openingHours || null,
+          vehicleAccessNotes: data.vehicleAccessNotes || null,
+          isDefault: data.isDefault,
+          zoneId: zone?.id || null,
+        },
+      });
+
+      if (data.contactName) {
+        await tx.customerContact.create({
+          data: {
+            organizationId: ctx.organizationId,
+            customerId: ctx.customerId,
+            siteId: created.id,
+            name: data.contactName,
+            email: data.contactEmail || null,
+            phone: data.contactPhone || null,
+            isPrimary: true,
+            isOperational: true,
+          },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          organizationId: ctx.organizationId,
+          actorUserId: ctx.userId,
+          action: "SITE_CREATED",
+          entityType: "Site",
+          entityId: created.id,
+          details: { reference, name: data.name, customerId: ctx.customerId },
+        },
+      });
+
+      return created;
+    });
+
+    revalidatePath("/portal/sites");
+    revalidatePath("/portal/book");
+    revalidatePath("/portal/dashboard");
+    return { success: true, siteId: site.id };
+  } catch (error) {
+    console.error("Create site error:", error);
+    return { error: "Failed to create site. Please try again." };
+  }
+}
+
+export async function updatePortalSite(
+  _prevState: SiteFormState,
+  formData: FormData
+): Promise<SiteFormState> {
+  const ctx = await requireCustomerAccess();
+
+  if (!ctx.isAdmin) {
+    return { error: "Only administrators can edit sites" };
+  }
+
+  const siteId = formData.get("siteId")?.toString() || "";
+  if (!siteId) return { error: "Site not found" };
+
+  const existingSite = await prisma.site.findFirst({
+    where: {
+      id: siteId,
+      customerId: ctx.customerId,
+      organizationId: ctx.organizationId,
+      ...(ctx.authorizedSiteIds ? { id: { in: ctx.authorizedSiteIds } } : {}),
+    },
+  });
+
+  if (!existingSite) {
+    return { error: "Site not found" };
+  }
+
+  const parsed = portalSiteSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      if (issue.path[0]) fieldErrors[String(issue.path[0])] = issue.message;
+    }
+    return { error: "Please check the site details.", fieldErrors };
+  }
+
+  try {
+    const data = parsed.data;
+    let zoneId = existingSite.zoneId;
+    if (data.postcode.toUpperCase() !== existingSite.postcode) {
+      const zone = await prisma.collectionZone.findFirst({
+        where: {
+          organizationId: ctx.organizationId,
+          postcodePrefixes: { has: data.postcode.split(" ")[0]?.toUpperCase() || "" },
+        },
+        select: { id: true },
+      });
+      zoneId = zone?.id || null;
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (data.isDefault) {
+        await tx.site.updateMany({
+          where: {
+            customerId: ctx.customerId,
+            organizationId: ctx.organizationId,
+            isDefault: true,
+            id: { not: siteId },
+          },
+          data: { isDefault: false },
+        });
+      }
+
+      await tx.site.update({
+        where: { id: siteId },
+        data: {
+          name: data.name,
+          address: data.address,
+          postcode: data.postcode.toUpperCase(),
+          contactName: data.contactName || null,
+          contactPhone: data.contactPhone || null,
+          contactEmail: data.contactEmail || null,
+          collectionInstructions: data.collectionInstructions || null,
+          openingHours: data.openingHours || null,
+          vehicleAccessNotes: data.vehicleAccessNotes || null,
+          isDefault: data.isDefault,
+          zoneId,
+        },
+      });
+
+      const currentPrimary = await tx.customerContact.findFirst({
+        where: {
+          organizationId: ctx.organizationId,
+          customerId: ctx.customerId,
+          siteId,
+          isPrimary: true,
+        },
+        select: { id: true },
+      });
+
+      if (data.contactName) {
+        await tx.customerContact.updateMany({
+          where: {
+            organizationId: ctx.organizationId,
+            customerId: ctx.customerId,
+            siteId,
+            isPrimary: true,
+          },
+          data: { isPrimary: false },
+        });
+
+        if (currentPrimary) {
+          await tx.customerContact.update({
+            where: { id: currentPrimary.id },
+            data: {
+              name: data.contactName,
+              email: data.contactEmail || null,
+              phone: data.contactPhone || null,
+              isActive: true,
+              isPrimary: true,
+              isOperational: true,
+            },
+          });
+        } else {
+          await tx.customerContact.create({
+            data: {
+              organizationId: ctx.organizationId,
+              customerId: ctx.customerId,
+              siteId,
+              name: data.contactName,
+              email: data.contactEmail || null,
+              phone: data.contactPhone || null,
+              isPrimary: true,
+              isOperational: true,
+            },
+          });
+        }
+      } else {
+        await tx.customerContact.updateMany({
+          where: {
+            organizationId: ctx.organizationId,
+            customerId: ctx.customerId,
+            siteId,
+            isPrimary: true,
+          },
+          data: { isPrimary: false, isActive: false },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          organizationId: ctx.organizationId,
+          actorUserId: ctx.userId,
+          action: "SITE_UPDATED",
+          entityType: "Site",
+          entityId: siteId,
+          details: {
+            name: data.name,
+            address: data.address,
+            postcode: data.postcode.toUpperCase(),
+            isDefault: data.isDefault,
+          },
+        },
+      });
+    });
+
+    revalidatePath("/portal/sites");
+    revalidatePath(`/portal/sites/${siteId}`);
+    revalidatePath("/portal/book");
+    revalidatePath("/portal/dashboard");
+    return { success: true, siteId };
+  } catch (error) {
+    console.error("Update site error:", error);
+    return { error: "Failed to update site. Please try again." };
+  }
+}
+
+export async function setDefaultSite(siteId: string) {
+  const ctx = await requireCustomerAccess();
+
+  if (!ctx.isAdmin || !canAccessSite(ctx, siteId)) {
+    return { success: false, error: "Only administrators can change default site" };
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    const site = await tx.site.findFirst({
+      where: {
+        id: siteId,
+        customerId: ctx.customerId,
+        organizationId: ctx.organizationId,
+        isActive: true,
+      },
+      select: { id: true },
+    });
+
+    if (!site) return { success: false as const, error: "Site not found or inactive" };
+
+    await tx.site.updateMany({
+      where: {
+        customerId: ctx.customerId,
+        organizationId: ctx.organizationId,
+        isDefault: true,
+      },
+      data: { isDefault: false },
+    });
+    await tx.site.update({ where: { id: siteId }, data: { isDefault: true } });
+    await tx.auditLog.create({
+      data: {
+        organizationId: ctx.organizationId,
+        actorUserId: ctx.userId,
+        action: "SITE_DEFAULT_CHANGED",
+        entityType: "Site",
+        entityId: siteId,
+      },
+    });
+    return { success: true as const };
+  });
+
+  if (result.success) {
+    revalidatePath("/portal/sites");
+    revalidatePath(`/portal/sites/${siteId}`);
+    revalidatePath("/portal/book");
+  }
+  return result;
+}
+
+export async function toggleSiteStatus(siteId: string) {
+  const ctx = await requireCustomerAccess();
+
+  if (!ctx.isAdmin || !canAccessSite(ctx, siteId)) {
+    return { success: false, error: "Only administrators can change site status" };
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    const site = await tx.site.findFirst({
+      where: {
+        id: siteId,
+        customerId: ctx.customerId,
+        organizationId: ctx.organizationId,
+      },
+      select: { id: true, isDefault: true, isActive: true },
+    });
+
+    if (!site) return { success: false as const, error: "Site not found" };
+    if (site.isDefault && site.isActive) {
+      return {
+        success: false as const,
+        error: "Cannot deactivate the primary site. Set another site as primary first.",
+      };
+    }
+
+    const isActive = !site.isActive;
+    await tx.site.update({ where: { id: siteId }, data: { isActive } });
+    await tx.auditLog.create({
+      data: {
+        organizationId: ctx.organizationId,
+        actorUserId: ctx.userId,
+        action: isActive ? "SITE_ACTIVATED" : "SITE_DEACTIVATED",
+        entityType: "Site",
+        entityId: siteId,
+        details: { isActive },
+      },
+    });
+    return { success: true as const, isActive };
+  });
+
+  if (result.success) {
+    revalidatePath("/portal/sites");
+    revalidatePath(`/portal/sites/${siteId}`);
+    revalidatePath("/portal/book");
+  }
+  return result;
 }

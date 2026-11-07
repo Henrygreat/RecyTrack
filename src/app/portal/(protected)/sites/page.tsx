@@ -1,5 +1,6 @@
 import { MapPin, Phone, Mail, Clock, Truck, Star } from "lucide-react";
-import { requireCustomerAccess, canAccessSite } from "@/lib/portal-access";
+import Link from "next/link";
+import { requireCustomerAccess } from "@/lib/portal-access";
 import { prisma } from "@/lib/prisma";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -12,7 +13,6 @@ export default async function PortalSites() {
     where: {
       customerId: ctx.customerId,
       organizationId: ctx.organizationId,
-      isActive: true,
       ...(ctx.authorizedSiteIds ? { id: { in: ctx.authorizedSiteIds } } : {}),
     },
     include: {
@@ -22,10 +22,7 @@ export default async function PortalSites() {
         },
       },
       _count: {
-        select: {
-          // This would require siteId on Collection model
-          // For now, we'll show site info without collection counts
-        },
+        select: { collections: true },
       },
     },
     orderBy: [{ isDefault: "desc" }, { name: "asc" }],
@@ -33,13 +30,23 @@ export default async function PortalSites() {
 
   return (
     <>
-      <div style={{ marginBottom: "1.5rem" }}>
-        <h1 style={{ fontSize: "1.5rem", fontWeight: "600", color: "#0f172a", margin: 0 }}>
-          Your Sites
-        </h1>
-        <p style={{ color: "#64748b", marginTop: "0.25rem" }}>
-          Collection locations registered for {ctx.customerAccess.customer.name}
-        </p>
+      <div style={{ marginBottom: "1.5rem", display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+        <div>
+          <h1 style={{ fontSize: "1.5rem", fontWeight: "600", color: "#0f172a", margin: 0 }}>
+            Your Sites
+          </h1>
+          <p style={{ color: "#64748b", marginTop: "0.25rem" }}>
+            Collection locations registered for {ctx.customerAccess.customer.name}
+          </p>
+        </div>
+        {ctx.isAdmin && ctx.authorizedSiteIds === null && (
+          <Link
+            href="/portal/sites/new"
+            className="inline-flex min-h-10 items-center justify-center rounded-md bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800"
+          >
+            Add site
+          </Link>
+        )}
       </div>
 
       <Card>
@@ -101,10 +108,21 @@ export default async function PortalSites() {
                             }}
                           >
                             <Star className="w-3 h-3" />
-                            Default
+                            Primary
+                          </span>
+                        )}
+                        {!site.isActive && (
+                          <span className="badge" style={{ backgroundColor: "#e2e8f0", color: "#475569" }}>
+                            Inactive
                           </span>
                         )}
                       </div>
+                      <Link
+                        href={`/portal/sites/${site.id}`}
+                        className="mt-1 inline-flex text-sm font-medium text-teal-700 hover:text-teal-800"
+                      >
+                        View site · {site._count.collections} collections
+                      </Link>
                       {site.zone && (
                         <span
                           style={{

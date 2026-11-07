@@ -109,7 +109,7 @@ AssetStatus: EXPECTED | COLLECTED | RECEIVED | INSPECTION |
 
 ## Application Routes
 
-### Implemented Routes
+### Initial Operations Routes
 
 | Route | Type | Functionality |
 |-------|------|---------------|
@@ -124,7 +124,7 @@ AssetStatus: EXPECTED | COLLECTED | RECEIVED | INSPECTION |
 | `/dashboard/routes` | Protected | Route calendar view |
 | `/api/auth/[...nextauth]` | API | Auth.js handlers |
 
-### Not Implemented
+### Initial Operations Gaps
 
 - Asset Inventory
 - Warehouse
@@ -136,6 +136,25 @@ AssetStatus: EXPECTED | COLLECTED | RECEIVED | INSPECTION |
 - User Management
 - Search
 - Notifications
+
+### Customer Portal — Sites
+
+The customer portal uses the existing `Customer`, `Site`, `CustomerContact`,
+`CustomerAccess`, and `SiteAccess` models; site management does not introduce
+duplicate customer or site tables. Collections already reference sites through
+`Collection.siteId`, which supports site-specific booking and history.
+
+| Route | Type | Functionality |
+|-------|------|---------------|
+| `/portal/sites` | Protected | View active and inactive authorized sites |
+| `/portal/sites/new` | Protected | Customer-admin site creation |
+| `/portal/sites/[id]` | Protected | Site details and collection history |
+| `/portal/sites/[id]/edit` | Protected | Edit an authorized site and its primary contact |
+| `/portal/book` | Protected | Book collections for active authorized sites |
+
+Site writes enforce customer and organization scope, respect site grants, and
+record audit events. Equipment management and customer document-library support
+are separate follow-on work and are not represented by these routes.
 
 ## Authentication & Authorization
 

@@ -34,6 +34,7 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { href: "/portal/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/portal/sites", label: "Sites", icon: MapPin },
   { href: "/portal/assets", label: "Assets", icon: Package },
   { href: "/portal/certificates", label: "Certificates", icon: Award },
   { href: "/portal/collections", label: "Collections", icon: Truck },

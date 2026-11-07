@@ -12,7 +12,44 @@ import {
   handoverStatusEnum,
   custodyExceptionSchema,
   custodyExceptionTypeEnum,
+  portalSiteSchema,
 } from "./validation";
+
+describe("portalSiteSchema", () => {
+  const validSite = {
+    name: "Main office",
+    address: "12 Example Road",
+    postcode: "sw1a 1aa",
+    contactName: "Site Contact",
+    contactPhone: "020 1234 5678",
+    contactEmail: "site@example.com",
+    collectionInstructions: "Use the rear entrance",
+    openingHours: "09:00-17:00",
+    vehicleAccessNotes: "Loading bay access",
+  };
+
+  it("trims and validates site details and defaults the primary flag", () => {
+    const result = portalSiteSchema.safeParse({ ...validSite, name: " Main office " });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.name).toBe("Main office");
+      expect(result.data.isDefault).toBe(false);
+    }
+  });
+
+  it("accepts an explicit primary-site selection", () => {
+    const result = portalSiteSchema.safeParse({ ...validSite, isDefault: "true" });
+
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.isDefault).toBe(true);
+  });
+
+  it("rejects malformed email and invalid primary-site values", () => {
+    expect(portalSiteSchema.safeParse({ ...validSite, contactEmail: "invalid" }).success).toBe(false);
+    expect(portalSiteSchema.safeParse({ ...validSite, isDefault: "yes" }).success).toBe(false);
+  });
+});
 
 // ============================================
 // INSPECTION VALIDATION TESTS

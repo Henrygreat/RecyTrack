@@ -46,6 +46,19 @@ export const siteUpdateSchema = siteSchema.extend({
   id: z.string().min(1),
 });
 
+export const portalSiteSchema = z.object({
+  name: z.string().trim().min(2, "Site name must be at least 2 characters").max(160),
+  address: z.string().trim().min(5, "Address must be at least 5 characters").max(240),
+  postcode: z.string().trim().min(3, "Postcode is required").max(16),
+  contactName: z.string().trim().max(120).optional().or(z.literal("")),
+  contactPhone: z.string().trim().max(40).optional().or(z.literal("")),
+  contactEmail: z.union([z.string().email("Invalid email address"), z.literal("")]).optional(),
+  collectionInstructions: z.string().trim().max(1000).optional().or(z.literal("")),
+  vehicleAccessNotes: z.string().trim().max(500).optional().or(z.literal("")),
+  openingHours: z.string().trim().max(200).optional().or(z.literal("")),
+  isDefault: z.enum(["true", "false"]).optional().default("false").transform((value) => value === "true"),
+});
+
 // ============================================
 // CONTACT VALIDATION
 // ============================================
