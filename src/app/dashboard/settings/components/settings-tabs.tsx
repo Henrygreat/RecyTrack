@@ -1,18 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, Palette, Settings, Bell } from "lucide-react";
+import { Building2, Palette, Settings, Bell, PoundSterling } from "lucide-react";
 import { ProfileForm } from "./profile-form";
 import { BrandingForm } from "./branding-form";
 import { OperationalForm } from "./operational-form";
 import { NotificationsForm } from "./notifications-form";
+import { CommercialForm } from "./commercial-form";
 import type { OrganizationSettings } from "../actions";
+import type { OrganizationCommercialSettings } from "@/lib/commercial-types";
 
 interface SettingsTabsProps {
   settings: OrganizationSettings;
+  commercialSettings: OrganizationCommercialSettings;
 }
 
-type TabId = "profile" | "branding" | "operational" | "notifications";
+type TabId = "profile" | "branding" | "operational" | "notifications" | "commercial";
 
 const tabs: { id: TabId; label: string; icon: typeof Building2; description: string }[] = [
   {
@@ -39,9 +42,15 @@ const tabs: { id: TabId; label: string; icon: typeof Building2; description: str
     icon: Bell,
     description: "Email notification preferences",
   },
+  {
+    id: "commercial",
+    label: "Commercial",
+    icon: PoundSterling,
+    description: "Pricing policies and commercial terms",
+  },
 ];
 
-export function SettingsTabs({ settings }: SettingsTabsProps) {
+export function SettingsTabs({ settings, commercialSettings }: SettingsTabsProps) {
   const [activeTab, setActiveTab] = useState<TabId>("profile");
 
   return (
@@ -97,6 +106,11 @@ export function SettingsTabs({ settings }: SettingsTabsProps) {
           {activeTab === "branding" && <BrandingForm settings={settings} />}
           {activeTab === "operational" && <OperationalForm settings={settings} />}
           {activeTab === "notifications" && <NotificationsForm settings={settings} />}
+          {activeTab === "commercial" && (
+            <div style={{ padding: "1.5rem" }}>
+              <CommercialForm settings={commercialSettings} />
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { Role } from "@prisma/client";
 import { SettingsTabs } from "./components/settings-tabs";
 import type { OrganizationSettings, OperationalSettings, NotificationSettings } from "./actions";
+import type { OrganizationCommercialSettings } from "@/lib/commercial-types";
+import { DEFAULT_COMMERCIAL_SETTINGS } from "@/lib/commercial-types";
 
 const ADMIN_ROLES: Role[] = ["OWNER", "ADMIN"];
 
@@ -41,6 +43,10 @@ export default async function SettingsPage() {
     notifications: org.notifications as NotificationSettings | null,
   };
 
+  // Extract commercial settings from org.settings JSON
+  const orgSettings = org.settings as Record<string, unknown> | null;
+  const commercialSettings = (orgSettings?.commercial as OrganizationCommercialSettings) || DEFAULT_COMMERCIAL_SETTINGS;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -52,7 +58,7 @@ export default async function SettingsPage() {
       </div>
 
       {/* Settings Tabs */}
-      <SettingsTabs settings={settings} />
+      <SettingsTabs settings={settings} commercialSettings={commercialSettings} />
     </div>
   );
 }

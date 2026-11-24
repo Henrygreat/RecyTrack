@@ -329,6 +329,14 @@ model Organization {
   documents            Document[]
   // User Notifications
   userNotifications    Notification[]        @relation("OrgNotifications")
+  // Phase 6: Commercial
+  pricingPolicies      PricingPolicy[]
+  customerTiers        CustomerTier[]
+  customerContracts    CustomerContract[]
+  quotes               Quote[]
+  collectionCosts      CollectionCost[]
+  assetRevenues        AssetRevenue[]
+  customerRebates      CustomerRebate[]
 }
 
 model Membership {
@@ -375,6 +383,9 @@ model Customer {
   // Legacy field - kept for migration compatibility
   contactName String?
 
+  // Commercial (Phase 6)
+  tierId String? // Customer tier for pricing
+
   organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   sites          Site[]
   contacts       CustomerContact[]
@@ -383,11 +394,17 @@ model Customer {
   customerAccess CustomerAccess[]
   invitations    CustomerInvitation[]
   certificates   Certificate[]
+  // Phase 6: Commercial
+  tier           CustomerTier?        @relation(fields: [tierId], references: [id])
+  contracts      CustomerContract[]
+  quotes         Quote[]
+  rebates        CustomerRebate[]
 
   @@unique([organizationId, reference])
   @@unique([id, organizationId])
   @@index([organizationId, name])
   @@index([organizationId, status])
+  @@index([tierId])
 }
 
 model Site {
@@ -619,14 +636,14 @@ model CustomerRegistration {
 /// Tokens are stored as cryptographic hashes (SHA-256).
 /// Each user can have at most one valid token at a time.
 model PasswordResetToken {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  tokenHash String   @unique // SHA-256 hash of the token (never store raw token)
+  tokenHash String    @unique // SHA-256 hash of the token (never store raw token)
   expiresAt DateTime
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   usedAt    DateTime? // Set when token is consumed
-  ipAddress String?  // IP that requested the reset (for audit)
-  userAgent String?  // User agent that requested the reset (for audit)
+  ipAddress String? // IP that requested the reset (for audit)
+  userAgent String? // User agent that requested the reset (for audit)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -725,6 +742,59 @@ model Collection {
   signatureData String? // Base64 signature image
   proofPhotos   String[] // Array of photo URLs
 
+  // ============================================
+  // COMMERCIAL EXTENSION (Phase 6)
+  // ============================================
+
+  // Pricing context
+  contractId      String? // Active contract at time of booking
+  quotationId     String? // If quote was required/provided
+  pricingPolicyId String? // Applied pricing policy
+
+  // Commercial classification
+  commercialType   CollectionCommercialType @default(COMMERCIAL_STANDARD)
+  chargeableStatus ChargeableStatus         @default(CHARGEABLE_PENDING)
+
+  // Price breakdown (amounts in minor units - pence)
+  collectionCharge   Int? // Collection service charge
+  transportCharge    Int? // Transport charge
+  dataServicesCharge Int? // Data erasure/destruction
+  otherCharges       Int? // Other service charges
+  subtotalCharges    Int? // Sum of above
+
+  // Discounts
+  discountAmount Int? // Total discounts applied
+  discountReason String? // Why discount was applied
+
+  // Tax
+  taxRate   Decimal? @db.Decimal(5, 2)
+  taxAmount Int?
+
+  // Total
+  totalCharge Int? // Final amount to charge
+  currency    String @default("GBP")
+
+  // Free collection tracking
+  isFreeCollection     Boolean @default(true) // Default: free
+  freeCollectionReason String? // Why it's free (rule that matched)
+  freeCollectionRuleId String? // Which rule made it free
+
+  // Value offset
+  estimatedAssetValue Int? // Estimated recovery value
+  rebateAmount        Int? // Customer rebate amount
+  netCustomerAmount   Int? // Total charge minus rebate
+
+  // Customer acceptance (for chargeable collections)
+  chargesDisclosedAt    DateTime? // When charges were shown
+  chargesAcceptedAt     DateTime? // When customer accepted
+  chargesAcceptedBy     String? // Who accepted
+  chargesAcceptedMethod String? // How accepted (portal, email, phone)
+
+  // Invoice tracking
+  invoiceRequired Boolean @default(false)
+  invoiceId       String? // Link to invoice when generated
+  invoiceStatus   String? // PENDING, GENERATED, SENT, PAID
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -734,6 +804,10 @@ model Collection {
   routeDate     RouteDate?               @relation(fields: [routeDateId, organizationId], references: [id, organizationId])
   assets        Asset[]
   statusHistory CollectionStatusChange[]
+  // Phase 6: Commercial
+  contract      CustomerContract?        @relation(fields: [contractId], references: [id])
+  charges       CollectionCharge[]
+  costs         CollectionCost[]
 
   @@unique([organizationId, reference])
   @@unique([id, organizationId])
@@ -741,6 +815,8 @@ model Collection {
   @@index([organizationId, scheduledDate])
   @@index([driverId, status])
   @@index([customerId, status])
+  @@index([contractId])
+  @@index([chargeableStatus])
 }
 
 model CollectionStatusChange {
@@ -867,6 +943,8 @@ model Asset {
   stocktakeItems    StocktakeItem[]
   // Phase 5.1: Storage Media within this asset
   storageMedia      StorageMedia[]
+  // Phase 6: Commercial
+  revenues          AssetRevenue[]
 
   @@unique([organizationId, assetTag])
   @@unique([id, organizationId])
@@ -2534,6 +2612,115 @@ enum DocumentStatus {
   DELETED // Soft deleted
 }
 
+// ============================================
+// COMMERCIAL ENUMS (Phase 6)
+// ============================================
+
+enum ServiceType {
+  COLLECTION // Collection service
+  TRANSPORT_SCHEDULED // Transport on scheduled route
+  TRANSPORT_DEDICATED // Dedicated/ad-hoc transport
+  TRANSPORT_URGENT // Urgent same-day transport
+  DATA_ERASURE_STANDARD // Standard data wipe
+  DATA_ERASURE_CERTIFIED // Certified erasure with certificate
+  PHYSICAL_DESTRUCTION // Physical media destruction
+  INSPECTION // Asset inspection service
+  STORAGE // Warehouse storage
+  REMARKETING // Asset resale service
+  RECYCLING // Recycling processing
+  DOCUMENTATION // Certificate/documentation
+}
+
+enum ChargeType {
+  FREE // No charge
+  CONDITIONAL_FREE // Free if conditions met
+  INCLUDED_IN_CONTRACT // Covered by contract
+  FIXED // Fixed fee
+  PER_ITEM // Per item/unit charge
+  PER_WEIGHT // Per kg/tonne charge
+  PER_DISTANCE // Per mile/km charge
+  PERCENTAGE // Percentage of value
+  QUOTE_REQUIRED // Requires quotation
+  CUSTOM // Custom calculation
+}
+
+enum ChargeCalculationBasis {
+  FLAT // Single flat fee
+  TIERED // Tiered pricing (quantity breaks)
+  SLIDING_SCALE // Sliding scale
+  MINIMUM_PLUS_UNIT // Minimum fee + per-unit
+}
+
+enum ContractStatus {
+  CONTRACT_DRAFT // Being negotiated
+  CONTRACT_PENDING // Awaiting approval
+  CONTRACT_ACTIVE // Currently active
+  CONTRACT_EXPIRED // Past end date
+  CONTRACT_TERMINATED // Terminated early
+  CONTRACT_SUSPENDED // Temporarily suspended
+}
+
+enum QuoteStatus {
+  QUOTE_DRAFT // Being prepared
+  QUOTE_SENT // Sent to customer
+  QUOTE_ACCEPTED // Customer accepted
+  QUOTE_REJECTED // Customer rejected
+  QUOTE_EXPIRED // Past validity date
+  QUOTE_SUPERSEDED // Replaced by newer quote
+}
+
+enum CollectionCommercialType {
+  COMMERCIAL_STANDARD // Regular collection
+  COMMERCIAL_CONTRACTED // Under customer contract
+  COMMERCIAL_QUOTED // Based on accepted quote
+  COMMERCIAL_AD_HOC // One-off with custom pricing
+}
+
+enum ChargeableStatus {
+  CHARGEABLE_PENDING // Not yet determined
+  CHARGEABLE_FREE // Confirmed free
+  CHARGEABLE_CONDITIONAL // Free because conditions met
+  CHARGEABLE_YES // Will be charged
+  CHARGEABLE_QUOTED // Charges per accepted quote
+  CHARGEABLE_WAIVED // Charges waived (with reason)
+}
+
+enum CostCategory {
+  COST_TRANSPORT_FUEL // Fuel costs
+  COST_TRANSPORT_VEHICLE // Vehicle costs
+  COST_TRANSPORT_DRIVER // Driver labour
+  COST_TRANSPORT_TOLLS // Road tolls, congestion charges
+  COST_PROCESSING_LABOUR // Warehouse/processing staff
+  COST_PROCESSING_MATERIALS // Packaging, supplies
+  COST_DATA_ERASURE // Erasure software/tools
+  COST_DESTRUCTION // Destruction processing
+  COST_DISPOSAL // Waste disposal
+  COST_CERTIFICATION // Certificate generation
+  COST_OVERHEAD // Allocated overhead
+  COST_OTHER // Other costs
+}
+
+enum RevenueCategory {
+  REVENUE_RESALE // Asset resale to buyer
+  REVENUE_REFURBISHMENT // Refurbished resale
+  REVENUE_PARTS // Parts/component sales
+  REVENUE_SCRAP_METAL // Scrap metal value
+  REVENUE_SCRAP_PLASTIC // Scrap plastic value
+  REVENUE_SCRAP_OTHER // Other scrap materials
+  REVENUE_PRECIOUS_METALS // Gold, silver, palladium recovery
+  REVENUE_SERVICE_FEE // Service fees charged
+  REVENUE_CERTIFICATE_FEE // Certificate fees
+  REVENUE_OTHER // Other revenue
+}
+
+enum RebateStatus {
+  REBATE_CALCULATED // Rebate calculated
+  REBATE_PENDING_APPROVAL // Awaiting approval
+  REBATE_APPROVED // Approved for payment
+  REBATE_PAID // Payment made
+  REBATE_CANCELLED // Rebate cancelled
+}
+
 model Document {
   id             String @id @default(cuid())
   organizationId String
@@ -2592,4 +2779,565 @@ model Document {
   @@index([organizationId, status])
   @@index([organizationId, isCurrentVersion])
   @@index([parentDocumentId])
+}
+
+// ============================================
+// PHASE 6: COMMERCIAL - PRICING MODELS
+// ============================================
+
+/// Organization-level pricing policy template
+/// Can be assigned to customer tiers or individual customers via contracts
+model PricingPolicy {
+  id             String @id @default(cuid())
+  organizationId String
+
+  // Identification
+  name        String // e.g., "Standard Pricing", "Enterprise Rates"
+  code        String // Short code e.g., "STD", "ENT"
+  description String?
+
+  // Status
+  isDefault Boolean @default(false) // Organization default policy
+  isActive  Boolean @default(true)
+
+  // Validity
+  effectiveDate DateTime?
+  expiryDate    DateTime?
+
+  // Version control
+  version           Int     @default(1)
+  previousVersionId String?
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdByUserId String?
+  createdByName   String?
+
+  // Relations
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  items        PricingPolicyItem[]
+  tiers        CustomerTier[]
+  contracts    CustomerContract[]
+
+  @@unique([organizationId, code])
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+  @@index([organizationId, isDefault])
+}
+
+/// Individual service pricing within a policy
+model PricingPolicyItem {
+  id              String @id @default(cuid())
+  pricingPolicyId String
+
+  // Service identification
+  serviceType    ServiceType
+  serviceSubtype String? // For granular pricing e.g., "HDD" vs "SSD" destruction
+
+  // Charge configuration
+  chargeType       ChargeType
+  calculationBasis ChargeCalculationBasis @default(FLAT)
+
+  // Pricing (amounts in minor units, e.g., pence for GBP)
+  baseRate      Int? // Base/flat rate in pence
+  unitRate      Int? // Per-unit rate in pence
+  minimumCharge Int? // Minimum charge in pence
+  maximumCharge Int? // Maximum/cap in pence
+
+  // For tiered pricing - Array of { minQty, maxQty, rate }
+  tiers Json?
+
+  // For percentage-based charges
+  percentage Decimal? @db.Decimal(5, 2) // e.g., 15.00 for 15%
+
+  // Conditions for CONDITIONAL_FREE
+  freeConditions Json? // Conditions that make this service free
+
+  // Notes
+  description   String?
+  internalNotes String?
+
+  // Status
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  pricingPolicy PricingPolicy @relation(fields: [pricingPolicyId], references: [id], onDelete: Cascade)
+
+  @@unique([pricingPolicyId, serviceType, serviceSubtype])
+  @@index([pricingPolicyId, isActive])
+}
+
+/// Customer segmentation for tier-based pricing
+model CustomerTier {
+  id             String @id @default(cuid())
+  organizationId String
+
+  // Identification
+  name        String // e.g., "Enterprise", "SMB", "Partner"
+  code        String // Short code e.g., "ENT", "SMB", "PTR"
+  description String?
+
+  // Pricing link
+  pricingPolicyId String? // Default pricing for this tier
+
+  // Rebate settings (can override org defaults)
+  rebatePercentage Decimal? @db.Decimal(5, 2)
+
+  // Auto-assignment criteria (optional)
+  autoAssignCriteria Json?
+
+  // Display
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organization  Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pricingPolicy PricingPolicy?     @relation(fields: [pricingPolicyId], references: [id])
+  customers     Customer[]
+  contracts     CustomerContract[]
+
+  @@unique([organizationId, code])
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+}
+
+// ============================================
+// PHASE 6: COMMERCIAL - CUSTOMER CONTRACTS
+// ============================================
+
+/// Customer-specific contract with pricing terms
+model CustomerContract {
+  id             String @id @default(cuid())
+  organizationId String
+  customerId     String
+
+  // Identification
+  reference String // Contract reference e.g., "CON-0001"
+  name      String? // Contract name/description
+
+  // Contract type
+  contractType String? // e.g., "FRAMEWORK", "SPOT", "RETAINER"
+
+  // Pricing basis
+  pricingPolicyId String? // Base pricing policy
+  tierId          String? // Customer tier (for reference)
+
+  // Status
+  status ContractStatus @default(CONTRACT_DRAFT)
+
+  // Validity period
+  startDate DateTime
+  endDate   DateTime? // Null = no end date (rolling)
+
+  // Auto-renewal
+  autoRenew         Boolean @default(false)
+  renewalTermMonths Int?
+  renewalNoticeDays Int?
+
+  // Payment terms
+  paymentTermsDays Int    @default(30)
+  currency         String @default("GBP")
+
+  // Credit limit (in minor units)
+  creditLimit Int?
+
+  // Volume commitments
+  minimumVolume   Json?
+  volumeDiscounts Json?
+
+  // Rebate terms
+  rebateEnabled    Boolean  @default(false)
+  rebatePercentage Decimal? @db.Decimal(5, 2)
+  rebateThreshold  Int?
+
+  // Free collection terms
+  freeCollectionEnabled Boolean @default(false)
+  freeCollectionTerms   Json?
+
+  // Document
+  documentUrl String?
+
+  // Approval workflow
+  approvedAt       DateTime?
+  approvedByUserId String?
+  approvedByName   String?
+
+  // Termination
+  terminatedAt      DateTime?
+  terminationReason String?
+
+  // Notes
+  notes         String?
+  internalNotes String?
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdByUserId String?
+  createdByName   String?
+
+  // Relations
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer       Customer                @relation(fields: [customerId, organizationId], references: [id, organizationId])
+  pricingPolicy  PricingPolicy?          @relation(fields: [pricingPolicyId], references: [id])
+  tier           CustomerTier?           @relation(fields: [tierId], references: [id])
+  priceOverrides ContractPriceOverride[]
+  collections    Collection[]
+  quotes         Quote[]
+
+  @@unique([organizationId, reference])
+  @@unique([id, organizationId])
+  @@index([customerId])
+  @@index([organizationId, status])
+  @@index([organizationId, endDate])
+}
+
+/// Contract-specific price overrides
+model ContractPriceOverride {
+  id         String @id @default(cuid())
+  contractId String
+
+  // Service
+  serviceType    ServiceType
+  serviceSubtype String?
+
+  // Override pricing (in minor units)
+  chargeType    ChargeType
+  baseRate      Int?
+  unitRate      Int?
+  minimumCharge Int?
+  percentage    Decimal?   @db.Decimal(5, 2)
+
+  // Specific conditions for this override
+  conditions Json?
+
+  // Notes
+  notes String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  contract CustomerContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@unique([contractId, serviceType, serviceSubtype])
+  @@index([contractId])
+}
+
+// ============================================
+// PHASE 6: COMMERCIAL - QUOTATIONS
+// ============================================
+
+/// Quotation for services
+model Quote {
+  id             String  @id @default(cuid())
+  organizationId String
+  customerId     String
+  contractId     String?
+
+  // Identification
+  reference String // Quote reference e.g., "QUO-0001"
+
+  // Status
+  status QuoteStatus @default(QUOTE_DRAFT)
+
+  // Validity
+  issueDate  DateTime @default(now())
+  validUntil DateTime
+
+  // Totals (in minor units - pence)
+  subtotal    Int    @default(0)
+  taxAmount   Int    @default(0)
+  totalAmount Int    @default(0)
+  currency    String @default("GBP")
+
+  // Context
+  collectionId String?
+  description  String?
+
+  // Terms
+  paymentTerms       String?
+  termsAndConditions String? @db.Text
+
+  // Customer response
+  respondedAt     DateTime?
+  responseNotes   String?
+  acceptedByName  String?
+  acceptedByEmail String?
+
+  // PDF document
+  pdfUrl String?
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdByUserId String?
+  createdByName   String?
+
+  // Relations
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer          @relation(fields: [customerId, organizationId], references: [id, organizationId])
+  contract     CustomerContract? @relation(fields: [contractId], references: [id])
+  items        QuoteItem[]
+
+  @@unique([organizationId, reference])
+  @@unique([id, organizationId])
+  @@index([customerId])
+  @@index([organizationId, status])
+  @@index([collectionId])
+}
+
+/// Quote line items
+model QuoteItem {
+  id      String @id @default(cuid())
+  quoteId String
+
+  // Service
+  serviceType ServiceType
+  description String
+
+  // Quantity
+  quantity Int     @default(1)
+  unit     String?
+
+  // Pricing (in minor units - pence)
+  unitPrice Int
+  lineTotal Int
+
+  // Tax
+  taxRate   Decimal @default(0) @db.Decimal(5, 2)
+  taxAmount Int     @default(0)
+
+  // Notes
+  notes String?
+
+  // Display order
+  sortOrder Int @default(0)
+
+  // Timestamps
+  createdAt DateTime @default(now())
+
+  // Relations
+  quote Quote @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([quoteId])
+}
+
+// ============================================
+// PHASE 6: COMMERCIAL - COLLECTION CHARGES
+// ============================================
+
+/// Itemized charges for a collection (customer-facing)
+model CollectionCharge {
+  id             String @id @default(cuid())
+  collectionId   String
+  organizationId String
+
+  // Service
+  serviceType ServiceType
+  description String
+
+  // Quantity
+  quantity Int     @default(1)
+  unit     String?
+
+  // Pricing (in minor units - pence)
+  chargeType ChargeType
+  unitPrice  Int
+  lineTotal  Int
+
+  // Source of this charge
+  sourceType String // 'POLICY', 'CONTRACT', 'QUOTE', 'MANUAL'
+  sourceId   String?
+
+  // Tax
+  taxRate   Decimal @default(0) @db.Decimal(5, 2)
+  taxAmount Int     @default(0)
+
+  // Waiver
+  isWaived    Boolean @default(false)
+  waiveReason String?
+
+  // Notes
+  notes String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  collection Collection @relation(fields: [collectionId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@index([collectionId])
+  @@index([organizationId, serviceType])
+}
+
+// ============================================
+// PHASE 6: COMMERCIAL - COST TRACKING
+// ============================================
+
+/// Internal operational costs per collection (never shown to customer)
+model CollectionCost {
+  id             String @id @default(cuid())
+  collectionId   String
+  organizationId String
+
+  // Cost category
+  costCategory CostCategory
+  description  String
+
+  // Amount (in minor units - pence)
+  amount   Int
+  currency String @default("GBP")
+
+  // Quantity basis (optional breakdown)
+  quantity Decimal? @db.Decimal(10, 3)
+  unit     String?
+  unitCost Int?
+
+  // Source
+  sourceType      String? // 'ACTUAL', 'ESTIMATED', 'STANDARD'
+  sourceReference String?
+
+  // Timestamps
+  incurredAt       DateTime @default(now())
+  recordedAt       DateTime @default(now())
+  recordedByUserId String?
+  recordedByName   String?
+
+  // Notes
+  notes String?
+
+  // Relations
+  collection   Collection   @relation(fields: [collectionId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([collectionId])
+  @@index([organizationId, costCategory])
+  @@index([organizationId, incurredAt])
+}
+
+// ============================================
+// PHASE 6: COMMERCIAL - REVENUE TRACKING
+// ============================================
+
+/// Revenue generated from assets
+model AssetRevenue {
+  id             String @id @default(cuid())
+  assetId        String
+  organizationId String
+
+  // Revenue category
+  revenueCategory RevenueCategory
+  description     String
+
+  // Amount (in minor units - pence)
+  grossAmount Int
+  deductions  Int    @default(0)
+  netAmount   Int
+  currency    String @default("GBP")
+
+  // Related transaction
+  transactionType String?
+  transactionRef  String?
+  transactionDate DateTime?
+
+  // Buyer/recipient details
+  buyerName      String?
+  buyerReference String?
+
+  // Customer rebate tracking
+  rebateApplicable Boolean   @default(false)
+  rebatePercentage Decimal?  @db.Decimal(5, 2)
+  rebateAmount     Int?
+  rebatePaid       Boolean   @default(false)
+  rebatePaidAt     DateTime?
+
+  // Timestamps
+  realizedAt       DateTime @default(now())
+  recordedAt       DateTime @default(now())
+  recordedByUserId String?
+  recordedByName   String?
+
+  // Notes
+  notes String?
+
+  // Relations
+  asset        Asset        @relation(fields: [assetId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@index([organizationId, revenueCategory])
+  @@index([organizationId, realizedAt])
+}
+
+// ============================================
+// PHASE 6: COMMERCIAL - CUSTOMER REBATES
+// ============================================
+
+/// Customer rebate tracking and payment
+model CustomerRebate {
+  id             String @id @default(cuid())
+  organizationId String
+  customerId     String
+
+  // Identification
+  reference String // Rebate reference e.g., "REB-0001"
+
+  // Calculation period
+  periodStart DateTime
+  periodEnd   DateTime
+
+  // Assets included in calculation
+  assetCount      Int @default(0)
+  totalAssetValue Int @default(0)
+
+  // Rebate calculation
+  rebatePercentage Decimal @db.Decimal(5, 2)
+  calculatedAmount Int
+  adjustments      Int     @default(0)
+  finalAmount      Int
+  currency         String  @default("GBP")
+
+  // Status
+  status RebateStatus @default(REBATE_CALCULATED)
+
+  // Approval workflow
+  approvedAt       DateTime?
+  approvedByUserId String?
+  approvedByName   String?
+
+  // Payment
+  paidAt           DateTime?
+  paidByUserId     String?
+  paymentMethod    String?
+  paymentReference String?
+
+  // Notes
+  notes         String?
+  internalNotes String?
+
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer     @relation(fields: [customerId, organizationId], references: [id, organizationId])
+
+  @@unique([organizationId, reference])
+  @@index([customerId])
+  @@index([organizationId, status])
+  @@index([organizationId, periodEnd])
 }

@@ -5,6 +5,8 @@ import { canAccessSite, requireCustomerAccess } from "@/lib/portal-access";
 import { portalSiteSchema } from "@/lib/validation";
 import { revalidatePath } from "next/cache";
 import type { AssetStatus, MediaSanitisationStatus, CollectionStatus, CertificateType, CertificateStatus } from "@prisma/client";
+import { calculateCollectionPricing, evaluateFreeEligibility } from "@/lib/pricing";
+import type { PricingCalculationResult, FreeEligibilityInput } from "@/lib/commercial-types";
 
 // ============================================
 // DASHBOARD STATS
@@ -901,6 +903,118 @@ export async function getAvailableBookingDates(siteId: string) {
   return { success: true, routes: availableRoutes };
 }
 
+// ============================================
+// BOOKING PRICING
+// ============================================
+
+export type BookingPricingResult = {
+  success: boolean;
+  pricing?: {
+    isFree: boolean;
+    freeReason?: string;
+    quoteRequired: boolean;
+    charges: Array<{
+      description: string;
+      quantity: number;
+      unitPrice: number;
+      lineTotal: number;
+      taxAmount: number;
+    }>;
+    subtotal: number;
+    taxAmount: number;
+    total: number;
+    currency: string;
+  };
+  error?: string;
+};
+
+/**
+ * Calculate pricing for a collection booking
+ * Called when customer is filling in booking details to show charges upfront
+ */
+export async function getBookingPricing(input: {
+  siteId: string;
+  routeDateId: string;
+  equipmentCategories: string[];
+  itemEstimate: number;
+  estimatedValue?: number;
+  certifiedErasure?: boolean;
+  physicalDestruction?: boolean;
+}): Promise<BookingPricingResult> {
+  try {
+    const ctx = await requireCustomerAccess();
+
+    // Verify site belongs to customer
+    const site = await prisma.site.findFirst({
+      where: {
+        id: input.siteId,
+        customerId: ctx.customerId,
+        organizationId: ctx.organizationId,
+        isActive: true,
+        ...(ctx.authorizedSiteIds ? { id: { in: ctx.authorizedSiteIds } } : {}),
+      },
+      select: { id: true, postcode: true },
+    });
+
+    if (!site) {
+      return { success: false, error: "Site not found" };
+    }
+
+    // Get route date to check if it's a scheduled route
+    const routeDate = await prisma.routeDate.findFirst({
+      where: {
+        id: input.routeDateId,
+        organizationId: ctx.organizationId,
+        isOpen: true,
+      },
+      select: { id: true, serviceDate: true },
+    });
+
+    if (!routeDate) {
+      return { success: false, error: "Route not found" };
+    }
+
+    // Calculate pricing using the pricing engine
+    const pricingResult = await calculateCollectionPricing(ctx.organizationId, {
+      customerId: ctx.customerId,
+      siteId: input.siteId,
+      isScheduledRoute: true, // Portal bookings are always on scheduled routes
+      routeDateId: input.routeDateId,
+      equipmentCategories: input.equipmentCategories,
+      itemEstimate: input.itemEstimate,
+      estimatedValue: input.estimatedValue,
+      postcode: site.postcode || "",
+      requestedServices: {
+        certifiedErasure: input.certifiedErasure,
+        physicalDestruction: input.physicalDestruction,
+      },
+    });
+
+    return {
+      success: true,
+      pricing: {
+        isFree: pricingResult.isFree,
+        freeReason: pricingResult.freeReason,
+        quoteRequired: pricingResult.quoteRequired,
+        charges: pricingResult.charges.map((c) => ({
+          description: c.description,
+          quantity: c.quantity,
+          unitPrice: c.unitPrice,
+          lineTotal: c.lineTotal,
+          taxAmount: c.taxAmount,
+        })),
+        subtotal: pricingResult.subtotal,
+        taxAmount: pricingResult.taxAmount,
+        total: pricingResult.total,
+        currency: pricingResult.currency,
+      },
+    };
+  } catch (error) {
+    console.error("Get booking pricing error:", error);
+    return { success: false, error: "Failed to calculate pricing" };
+  }
+}
+
 export type BookingFormState = {
   error?: string;
   success?: boolean;
@@ -924,6 +1038,10 @@ export async function createPortalBooking(
     const contactPhone = formData.get("contactPhone") as string;
     const contactEmail = formData.get("contactEmail") as string;
 
+    // Commercial fields (from price disclosure step)
+    const chargesAccepted = formData.get("chargesAccepted") === "true";
+    const pricingDataJson = formData.get("pricingData") as string;
+
     // Validate required fields
     if (!siteId || !routeDateId) {
       return { error: "Please select a site and collection date" };
@@ -942,6 +1060,55 @@ export async function createPortalBooking(
 
     if (!site) {
       return { error: "Site not found" };
+    }
+
+    // Parse pricing data if provided
+    let pricingData: {
+      isFree: boolean;
+      freeReason?: string;
+      subtotal: number;
+      taxAmount: number;
+      total: number;
+      currency: string;
+      contractId?: string;
+    } | null = null;
+
+    if (pricingDataJson) {
+      try {
+        pricingData = JSON.parse(pricingDataJson);
+      } catch {
+        // Ignore parsing errors - will calculate fresh
+      }
+    }
+
+    // If pricing data wasn't provided, calculate it now
+    if (!pricingData) {
+      const pricingResult = await calculateCollectionPricing(ctx.organizationId, {
+        customerId: ctx.customerId,
+        siteId,
+        isScheduledRoute: true,
+        routeDateId,
+        equipmentCategories: equipmentCategories
+          ? equipmentCategories.split(",").map((c) => c.trim()).filter(Boolean)
+          : [],
+        itemEstimate,
+        postcode: site.postcode || "",
+      });
+
+      pricingData = {
+        isFree: pricingResult.isFree,
+        freeReason: pricingResult.freeReason,
+        subtotal: pricingResult.subtotal,
+        taxAmount: pricingResult.taxAmount,
+        total: pricingResult.total,
+        currency: pricingResult.currency,
+        contractId: pricingResult.contractId,
+      };
+    }
+
+    // If not free and charges not accepted, require acceptance
+    if (!pricingData.isFree && pricingData.total > 0 && !chargesAccepted) {
+      return { error: "Please accept the charges to proceed with booking" };
     }
 
     // Use transaction to check and reserve capacity
@@ -982,7 +1149,13 @@ export async function createPortalBooking(
       });
       const reference = `COLL-${String(count + 1).padStart(4, "0")}`;
 
-      // Create the collection
+      // Get user info for acceptance tracking
+      const user = await tx.user.findUnique({
+        where: { id: ctx.userId },
+        select: { name: true, email: true },
+      });
+
+      // Create the collection with commercial data
       const collection = await tx.collection.create({
         data: {
           organizationId: ctx.organizationId,
@@ -1005,6 +1178,24 @@ export async function createPortalBooking(
             : [],
           itemEstimate,
           customerInstructions,
+
+          // Commercial fields
+          commercialType: pricingData?.contractId ? "COMMERCIAL_CONTRACTED" : "COMMERCIAL_STANDARD",
+          chargeableStatus: pricingData?.isFree ? "CHARGEABLE_FREE" : "CHARGEABLE_YES",
+          isFreeCollection: pricingData?.isFree || false,
+          freeCollectionReason: pricingData?.freeReason || null,
+          contractId: pricingData?.contractId || null,
+          subtotalCharges: pricingData?.isFree ? 0 : pricingData?.subtotal || null,
+          taxAmount: pricingData?.isFree ? 0 : pricingData?.taxAmount || null,
+          totalCharge: pricingData?.isFree ? 0 : pricingData?.total || null,
+          currency: pricingData?.currency || "GBP",
+          invoiceRequired: !pricingData?.isFree && (pricingData?.total || 0) > 0,
+
+          // Acceptance tracking (only if charges apply)
+          chargesDisclosedAt: !pricingData?.isFree ? new Date() : null,
+          chargesAcceptedAt: !pricingData?.isFree && chargesAccepted ? new Date() : null,
+          chargesAcceptedBy: !pricingData?.isFree && chargesAccepted ? (user?.name || user?.email) : null,
+          chargesAcceptedMethod: !pricingData?.isFree && chargesAccepted ? "portal" : null,
         },
       });
 
@@ -1016,7 +1207,9 @@ export async function createPortalBooking(
           fromStatus: null,
           toStatus: "REQUESTED",
           changedByUserId: ctx.userId,
-          notes: "Booked via customer portal",
+          notes: pricingData?.isFree
+            ? `Booked via customer portal (Free: ${pricingData.freeReason || "Policy"})`
+            : `Booked via customer portal (Charges: ${pricingData?.currency || "GBP"} ${((pricingData?.total || 0) / 100).toFixed(2)})`,
         },
       });
 

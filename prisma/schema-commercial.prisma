@@ -1,0 +1,764 @@
+// ============================================
+// RECYTRACK COMMERCIAL MODEL ADDITIONS
+// ============================================
+//
+// This file contains all new models for the commercial
+// business model. Merge into schema.prisma when approved.
+//
+// Prerequisites: Run after merging:
+//   npx prisma migrate dev --name add_commercial_models
+//
+// ============================================
+
+// ============================================
+// NEW ENUMS
+// ============================================
+
+enum ServiceType {
+  COLLECTION              // Collection service
+  TRANSPORT_SCHEDULED     // Transport on scheduled route
+  TRANSPORT_DEDICATED     // Dedicated/ad-hoc transport
+  TRANSPORT_URGENT        // Urgent same-day transport
+  DATA_ERASURE_STANDARD   // Standard data wipe
+  DATA_ERASURE_CERTIFIED  // Certified erasure with certificate
+  PHYSICAL_DESTRUCTION    // Physical media destruction
+  INSPECTION              // Asset inspection service
+  STORAGE                 // Warehouse storage
+  REMARKETING             // Asset resale service
+  RECYCLING               // Recycling processing
+  DOCUMENTATION           // Certificate/documentation
+}
+
+enum ChargeType {
+  FREE                    // No charge
+  CONDITIONAL_FREE        // Free if conditions met
+  INCLUDED_IN_CONTRACT    // Covered by contract
+  FIXED                   // Fixed fee
+  PER_ITEM                // Per item/unit charge
+  PER_WEIGHT              // Per kg/tonne charge
+  PER_DISTANCE            // Per mile/km charge
+  PERCENTAGE              // Percentage of value
+  QUOTE_REQUIRED          // Requires quotation
+  CUSTOM                  // Custom calculation
+}
+
+enum ChargeCalculationBasis {
+  FLAT                    // Single flat fee
+  TIERED                  // Tiered pricing (quantity breaks)
+  SLIDING_SCALE           // Sliding scale
+  MINIMUM_PLUS_UNIT       // Minimum fee + per-unit
+}
+
+enum ContractStatus {
+  DRAFT                   // Being negotiated
+  PENDING_APPROVAL        // Awaiting approval
+  ACTIVE                  // Currently active
+  EXPIRED                 // Past end date
+  TERMINATED              // Terminated early
+  SUSPENDED               // Temporarily suspended
+}
+
+enum QuoteStatus {
+  DRAFT                   // Being prepared
+  SENT                    // Sent to customer
+  ACCEPTED                // Customer accepted
+  REJECTED                // Customer rejected
+  EXPIRED                 // Past validity date
+  SUPERSEDED              // Replaced by newer quote
+}
+
+enum CollectionCommercialType {
+  STANDARD                // Regular collection
+  CONTRACTED              // Under customer contract
+  QUOTED                  // Based on accepted quote
+  AD_HOC                  // One-off with custom pricing
+}
+
+enum ChargeableStatus {
+  PENDING                 // Not yet determined
+  FREE                    // Confirmed free
+  CONDITIONAL_FREE        // Free because conditions met
+  CHARGEABLE              // Will be charged
+  QUOTED                  // Charges per accepted quote
+  WAIVED                  // Charges waived (with reason)
+}
+
+enum CostCategory {
+  TRANSPORT_FUEL          // Fuel costs
+  TRANSPORT_VEHICLE       // Vehicle costs (depreciation, maintenance)
+  TRANSPORT_DRIVER        // Driver labour
+  TRANSPORT_TOLLS         // Road tolls, congestion charges
+  PROCESSING_LABOUR       // Warehouse/processing staff
+  PROCESSING_MATERIALS    // Packaging, supplies
+  DATA_ERASURE            // Erasure software/tools
+  DESTRUCTION             // Destruction processing
+  DISPOSAL                // Waste disposal
+  CERTIFICATION           // Certificate generation
+  OVERHEAD                // Allocated overhead
+  OTHER                   // Other costs
+}
+
+enum RevenueCategory {
+  RESALE                  // Asset resale to buyer
+  REFURBISHMENT           // Refurbished resale
+  PARTS                   // Parts/component sales
+  SCRAP_METAL             // Scrap metal value
+  SCRAP_PLASTIC           // Scrap plastic value
+  SCRAP_OTHER             // Other scrap materials
+  PRECIOUS_METALS         // Gold, silver, palladium recovery
+  SERVICE_FEE             // Service fees charged
+  CERTIFICATE_FEE         // Certificate fees
+  OTHER                   // Other revenue
+}
+
+enum RebateStatus {
+  CALCULATED              // Rebate calculated
+  PENDING_APPROVAL        // Awaiting approval
+  APPROVED                // Approved for payment
+  PAID                    // Payment made
+  CANCELLED               // Rebate cancelled
+}
+
+// ============================================
+// PRICING MODELS
+// ============================================
+
+/// Organization-level pricing policy template
+/// Can be assigned to customer tiers or individual customers via contracts
+model PricingPolicy {
+  id              String   @id @default(cuid())
+  organizationId  String
+
+  // Identification
+  name            String   // e.g., "Standard Pricing", "Enterprise Rates"
+  code            String   // Short code e.g., "STD", "ENT"
+  description     String?
+
+  // Status
+  isDefault       Boolean  @default(false)  // Organization default policy
+  isActive        Boolean  @default(true)
+
+  // Validity
+  effectiveDate   DateTime?
+  expiryDate      DateTime?
+
+  // Version control
+  version         Int      @default(1)
+  previousVersionId String?
+
+  // Timestamps
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdByUserId String?
+  createdByName   String?
+
+  // Relations
+  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  items           PricingPolicyItem[]
+  tiers           CustomerTier[]
+  contracts       CustomerContract[]
+
+  @@unique([organizationId, code])
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+  @@index([organizationId, isDefault])
+}
+
+/// Individual service pricing within a policy
+model PricingPolicyItem {
+  id               String   @id @default(cuid())
+  pricingPolicyId  String
+
+  // Service identification
+  serviceType      ServiceType
+  serviceSubtype   String?   // For granular pricing e.g., "HDD" vs "SSD" destruction
+
+  // Charge configuration
+  chargeType       ChargeType
+  calculationBasis ChargeCalculationBasis @default(FLAT)
+
+  // Pricing (amounts in minor units, e.g., pence for GBP)
+  baseRate         Int?      // Base/flat rate in pence
+  unitRate         Int?      // Per-unit rate in pence
+  minimumCharge    Int?      // Minimum charge in pence
+  maximumCharge    Int?      // Maximum/cap in pence
+
+  // For tiered pricing - Array of { minQty, maxQty, rate }
+  tiers            Json?
+
+  // For percentage-based charges
+  percentage       Decimal?  @db.Decimal(5, 2)  // e.g., 15.00 for 15%
+
+  // Conditions for CONDITIONAL_FREE
+  freeConditions   Json?     // Conditions that make this service free
+
+  // Notes
+  description      String?
+  internalNotes    String?
+
+  // Status
+  isActive         Boolean   @default(true)
+  sortOrder        Int       @default(0)
+
+  // Timestamps
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  // Relations
+  pricingPolicy    PricingPolicy @relation(fields: [pricingPolicyId], references: [id], onDelete: Cascade)
+
+  @@unique([pricingPolicyId, serviceType, serviceSubtype])
+  @@index([pricingPolicyId, isActive])
+}
+
+/// Customer segmentation for tier-based pricing
+model CustomerTier {
+  id               String   @id @default(cuid())
+  organizationId   String
+
+  // Identification
+  name             String   // e.g., "Enterprise", "SMB", "Partner"
+  code             String   // Short code e.g., "ENT", "SMB", "PTR"
+  description      String?
+
+  // Pricing link
+  pricingPolicyId  String?  // Default pricing for this tier
+
+  // Rebate settings (can override org defaults)
+  rebatePercentage Decimal? @db.Decimal(5, 2)
+
+  // Auto-assignment criteria (optional)
+  // Rules for automatic tier assignment based on customer properties
+  autoAssignCriteria Json?
+
+  // Display
+  sortOrder        Int      @default(0)
+  isActive         Boolean  @default(true)
+
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  // Relations
+  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  pricingPolicy    PricingPolicy?  @relation(fields: [pricingPolicyId], references: [id])
+  customers        Customer[]
+  contracts        CustomerContract[]
+
+  @@unique([organizationId, code])
+  @@unique([organizationId, name])
+  @@index([organizationId, isActive])
+}
+
+// ============================================
+// CUSTOMER CONTRACT
+// ============================================
+
+/// Customer-specific contract with pricing terms
+model CustomerContract {
+  id               String         @id @default(cuid())
+  organizationId   String
+  customerId       String
+
+  // Identification
+  reference        String         // Contract reference e.g., "CON-0001"
+  name             String?        // Contract name/description
+
+  // Contract type
+  contractType     String?        // e.g., "FRAMEWORK", "SPOT", "RETAINER"
+
+  // Pricing basis
+  pricingPolicyId  String?        // Base pricing policy
+  tierId           String?        // Customer tier (for reference)
+
+  // Status
+  status           ContractStatus @default(DRAFT)
+
+  // Validity period
+  startDate        DateTime
+  endDate          DateTime?      // Null = no end date (rolling)
+
+  // Auto-renewal
+  autoRenew        Boolean        @default(false)
+  renewalTermMonths Int?
+  renewalNoticeDays Int?          // Days notice before auto-renewal
+
+  // Payment terms
+  paymentTermsDays Int            @default(30)  // e.g., NET30
+  currency         String         @default("GBP")
+
+  // Credit limit (in minor units)
+  creditLimit      Int?
+
+  // Volume commitments - { period: 'MONTHLY', items: 100 }
+  minimumVolume    Json?
+
+  // Tiered discounts based on volume
+  volumeDiscounts  Json?
+
+  // Rebate terms
+  rebateEnabled    Boolean        @default(false)
+  rebatePercentage Decimal?       @db.Decimal(5, 2)
+  rebateThreshold  Int?           // Minimum asset value for rebate (pence)
+
+  // Free collection terms
+  freeCollectionEnabled Boolean   @default(false)
+  freeCollectionTerms   Json?     // Specific free collection rules for this contract
+
+  // Document
+  documentUrl      String?        // Link to signed contract document
+
+  // Approval workflow
+  approvedAt       DateTime?
+  approvedByUserId String?
+  approvedByName   String?
+
+  // Termination
+  terminatedAt     DateTime?
+  terminationReason String?
+
+  // Notes
+  notes            String?
+  internalNotes    String?
+
+  // Timestamps
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  createdByUserId  String?
+  createdByName    String?
+
+  // Relations
+  organization     Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer         Customer               @relation(fields: [customerId, organizationId], references: [id, organizationId])
+  pricingPolicy    PricingPolicy?         @relation(fields: [pricingPolicyId], references: [id])
+  tier             CustomerTier?          @relation(fields: [tierId], references: [id])
+  priceOverrides   ContractPriceOverride[]
+  collections      Collection[]
+  quotes           Quote[]
+
+  @@unique([organizationId, reference])
+  @@unique([id, organizationId])
+  @@index([customerId])
+  @@index([organizationId, status])
+  @@index([organizationId, endDate])
+}
+
+/// Contract-specific price overrides
+/// Allows negotiated rates that differ from the base pricing policy
+model ContractPriceOverride {
+  id              String      @id @default(cuid())
+  contractId      String
+
+  // Service
+  serviceType     ServiceType
+  serviceSubtype  String?
+
+  // Override pricing (in minor units)
+  chargeType      ChargeType
+  baseRate        Int?
+  unitRate        Int?
+  minimumCharge   Int?
+  percentage      Decimal?    @db.Decimal(5, 2)
+
+  // Specific conditions for this override
+  conditions      Json?
+
+  // Notes
+  notes           String?
+
+  // Timestamps
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  contract        CustomerContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@unique([contractId, serviceType, serviceSubtype])
+  @@index([contractId])
+}
+
+// ============================================
+// QUOTATION
+// ============================================
+
+/// Quotation for services
+model Quote {
+  id               String      @id @default(cuid())
+  organizationId   String
+  customerId       String
+  contractId       String?     // Optional link to contract
+
+  // Identification
+  reference        String      // Quote reference e.g., "QUO-0001"
+
+  // Status
+  status           QuoteStatus @default(DRAFT)
+
+  // Validity
+  issueDate        DateTime    @default(now())
+  validUntil       DateTime
+
+  // Totals (in minor units - pence)
+  subtotal         Int         @default(0)
+  taxAmount        Int         @default(0)
+  totalAmount      Int         @default(0)
+  currency         String      @default("GBP")
+
+  // Context
+  collectionId     String?     // If quote is for a specific collection
+  description      String?     // Quote description/scope
+
+  // Terms
+  paymentTerms     String?
+  termsAndConditions String?   @db.Text
+
+  // Customer response
+  respondedAt      DateTime?
+  responseNotes    String?
+  acceptedByName   String?
+  acceptedByEmail  String?
+
+  // PDF document
+  pdfUrl           String?
+
+  // Timestamps
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  createdByUserId  String?
+  createdByName    String?
+
+  // Relations
+  organization     Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer         Customer           @relation(fields: [customerId, organizationId], references: [id, organizationId])
+  contract         CustomerContract?  @relation(fields: [contractId], references: [id])
+  items            QuoteItem[]
+
+  @@unique([organizationId, reference])
+  @@unique([id, organizationId])
+  @@index([customerId])
+  @@index([organizationId, status])
+  @@index([collectionId])
+}
+
+/// Quote line items
+model QuoteItem {
+  id              String      @id @default(cuid())
+  quoteId         String
+
+  // Service
+  serviceType     ServiceType
+  description     String
+
+  // Quantity
+  quantity        Int         @default(1)
+  unit            String?     // e.g., "items", "kg", "miles"
+
+  // Pricing (in minor units - pence)
+  unitPrice       Int
+  lineTotal       Int
+
+  // Tax
+  taxRate         Decimal     @db.Decimal(5, 2) @default(0)
+  taxAmount       Int         @default(0)
+
+  // Notes
+  notes           String?
+
+  // Display order
+  sortOrder       Int         @default(0)
+
+  // Timestamps
+  createdAt       DateTime    @default(now())
+
+  // Relations
+  quote           Quote       @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([quoteId])
+}
+
+// ============================================
+// COLLECTION CHARGES (Customer-facing)
+// ============================================
+
+/// Itemized charges for a collection
+model CollectionCharge {
+  id              String      @id @default(cuid())
+  collectionId    String
+  organizationId  String
+
+  // Service
+  serviceType     ServiceType
+  description     String
+
+  // Quantity
+  quantity        Int         @default(1)
+  unit            String?     // e.g., "items", "kg", "miles"
+
+  // Pricing (in minor units - pence)
+  chargeType      ChargeType
+  unitPrice       Int
+  lineTotal       Int
+
+  // Source of this charge
+  sourceType      String      // 'POLICY', 'CONTRACT', 'QUOTE', 'MANUAL'
+  sourceId        String?     // ID of the pricing source
+
+  // Tax
+  taxRate         Decimal     @db.Decimal(5, 2) @default(0)
+  taxAmount       Int         @default(0)
+
+  // Waiver
+  isWaived        Boolean     @default(false)
+  waiveReason     String?
+
+  // Notes
+  notes           String?
+
+  // Timestamps
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  // Relations
+  collection      Collection  @relation(fields: [collectionId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@index([collectionId])
+  @@index([organizationId, serviceType])
+}
+
+// ============================================
+// COST TRACKING (Internal - never shown to customer)
+// ============================================
+
+/// Internal operational costs per collection
+model CollectionCost {
+  id               String       @id @default(cuid())
+  collectionId     String
+  organizationId   String
+
+  // Cost category
+  costCategory     CostCategory
+  description      String
+
+  // Amount (in minor units - pence)
+  amount           Int
+  currency         String       @default("GBP")
+
+  // Quantity basis (optional breakdown)
+  quantity         Decimal?     @db.Decimal(10, 3)
+  unit             String?      // e.g., "hours", "miles", "kg"
+  unitCost         Int?         // Cost per unit in pence
+
+  // Source
+  sourceType       String?      // 'ACTUAL', 'ESTIMATED', 'STANDARD'
+  sourceReference  String?      // e.g., fuel receipt reference, timesheet ID
+
+  // Timestamps
+  incurredAt       DateTime     @default(now())  // When cost was incurred
+  recordedAt       DateTime     @default(now())  // When recorded in system
+  recordedByUserId String?
+  recordedByName   String?
+
+  // Notes
+  notes            String?
+
+  // Relations
+  collection       Collection   @relation(fields: [collectionId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@index([collectionId])
+  @@index([organizationId, costCategory])
+  @@index([organizationId, incurredAt])
+}
+
+// ============================================
+// REVENUE TRACKING
+// ============================================
+
+/// Revenue generated from assets
+model AssetRevenue {
+  id               String          @id @default(cuid())
+  assetId          String
+  organizationId   String
+
+  // Revenue category
+  revenueCategory  RevenueCategory
+  description      String
+
+  // Amount (in minor units - pence)
+  grossAmount      Int             // Before any deductions
+  deductions       Int             @default(0)  // Fees, commissions, etc.
+  netAmount        Int             // After deductions
+  currency         String          @default("GBP")
+
+  // Related transaction
+  transactionType  String?         // 'SALE', 'SCRAP', 'REFUND'
+  transactionRef   String?         // External reference (invoice, PO, etc.)
+  transactionDate  DateTime?
+
+  // Buyer/recipient details
+  buyerName        String?
+  buyerReference   String?
+
+  // Customer rebate tracking
+  rebateApplicable Boolean         @default(false)
+  rebatePercentage Decimal?        @db.Decimal(5, 2)
+  rebateAmount     Int?            // Calculated rebate in pence
+  rebatePaid       Boolean         @default(false)
+  rebatePaidAt     DateTime?
+
+  // Timestamps
+  realizedAt       DateTime        @default(now())  // When revenue was realized
+  recordedAt       DateTime        @default(now())
+  recordedByUserId String?
+  recordedByName   String?
+
+  // Notes
+  notes            String?
+
+  // Relations
+  asset            Asset           @relation(fields: [assetId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  organization     Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([assetId])
+  @@index([organizationId, revenueCategory])
+  @@index([organizationId, realizedAt])
+}
+
+// ============================================
+// CUSTOMER REBATES
+// ============================================
+
+/// Customer rebate tracking and payment
+model CustomerRebate {
+  id               String       @id @default(cuid())
+  organizationId   String
+  customerId       String
+
+  // Identification
+  reference        String       // Rebate reference e.g., "REB-0001"
+
+  // Calculation period
+  periodStart      DateTime
+  periodEnd        DateTime
+
+  // Assets included in calculation
+  assetCount       Int          @default(0)
+  totalAssetValue  Int          @default(0)  // Sum of asset revenues in pence
+
+  // Rebate calculation
+  rebatePercentage Decimal      @db.Decimal(5, 2)
+  calculatedAmount Int          // Calculated rebate in pence
+  adjustments      Int          @default(0)   // Manual adjustments
+  finalAmount      Int          // After adjustments
+  currency         String       @default("GBP")
+
+  // Status
+  status           RebateStatus @default(CALCULATED)
+
+  // Approval workflow
+  approvedAt       DateTime?
+  approvedByUserId String?
+  approvedByName   String?
+
+  // Payment
+  paidAt           DateTime?
+  paidByUserId     String?
+  paymentMethod    String?      // 'BACS', 'CHEQUE', 'CREDIT_NOTE'
+  paymentReference String?
+
+  // Notes
+  notes            String?
+  internalNotes    String?
+
+  // Timestamps
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  // Relations
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer         Customer     @relation(fields: [customerId, organizationId], references: [id, organizationId])
+
+  @@unique([organizationId, reference])
+  @@index([customerId])
+  @@index([organizationId, status])
+  @@index([organizationId, periodEnd])
+}
+
+// ============================================
+// EXTENSIONS TO EXISTING MODELS
+// ============================================
+
+// Add these relations to Organization model:
+//
+// pricingPolicies   PricingPolicy[]
+// customerTiers     CustomerTier[]
+// customerContracts CustomerContract[]
+// quotes            Quote[]
+// assetRevenues     AssetRevenue[]
+// customerRebates   CustomerRebate[]
+
+// Add these fields to Customer model:
+//
+// tierId            String?
+// tier              CustomerTier?    @relation(fields: [tierId], references: [id])
+// contracts         CustomerContract[]
+// quotes            Quote[]
+// rebates           CustomerRebate[]
+
+// Add these fields to Collection model:
+//
+// // Pricing context
+// contractId          String?
+// pricingPolicyId     String?
+//
+// // Commercial classification
+// commercialType      CollectionCommercialType @default(STANDARD)
+// chargeableStatus    ChargeableStatus         @default(PENDING)
+//
+// // Price breakdown (in minor units - pence)
+// collectionCharge    Int?
+// transportCharge     Int?
+// dataServicesCharge  Int?
+// otherCharges        Int?
+// subtotalCharges     Int?
+//
+// // Discounts
+// discountAmount      Int?
+// discountReason      String?
+//
+// // Tax
+// taxRate             Decimal?          @db.Decimal(5, 2)
+// taxAmount           Int?
+//
+// // Total
+// totalCharge         Int?
+// currency            String            @default("GBP")
+//
+// // Free collection tracking
+// isFreeCollection    Boolean           @default(true)
+// freeCollectionReason String?
+// freeCollectionRuleId String?
+//
+// // Value offset
+// estimatedAssetValue Int?
+// rebateAmount        Int?
+// netCustomerAmount   Int?
+//
+// // Customer acceptance
+// chargesDisclosedAt  DateTime?
+// chargesAcceptedAt   DateTime?
+// chargesAcceptedBy   String?
+// chargesAcceptedMethod String?
+//
+// // Invoice tracking
+// invoiceRequired     Boolean           @default(false)
+// invoiceId           String?
+// invoiceStatus       String?
+//
+// // Relations
+// contract            CustomerContract? @relation(...)
+// charges             CollectionCharge[]
+// costs               CollectionCost[]
+
+// Add these fields to Asset model:
+//
+// revenues            AssetRevenue[]
