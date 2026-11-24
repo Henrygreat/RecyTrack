@@ -1,10 +1,21 @@
-import type { ReactNode } from "react";
+"use client";
+
 import type { LucideIcon } from "lucide-react";
+import { getIcon, type IconName } from "@/lib/icons";
 
 interface MetricCardProps {
   title: string;
   value: string | number;
   subtitle?: string;
+  /**
+   * Icon name for Server Component → Client Component usage.
+   * Preferred method - pass a string that gets resolved client-side.
+   */
+  iconName?: IconName;
+  /**
+   * Direct icon component for Client Component → Client Component usage.
+   * @deprecated Use iconName when passing from Server Components.
+   */
   icon?: LucideIcon;
   trend?: {
     value: number;
@@ -13,16 +24,31 @@ interface MetricCardProps {
   className?: string;
 }
 
-export function MetricCard({ title, value, subtitle, icon: Icon, trend, className = "" }: MetricCardProps) {
+export function MetricCard({
+  title,
+  value,
+  subtitle,
+  iconName,
+  icon: DirectIcon,
+  trend,
+  className = "",
+}: MetricCardProps) {
+  // Prefer iconName (safe for server/client boundary), fallback to direct icon
+  const Icon = iconName ? getIcon(iconName) : DirectIcon;
+
   return (
-    <div className={`bg-white rounded-xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow ${className}`}>
+    <div
+      className={`bg-white rounded-xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition-shadow ${className}`}
+    >
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <p className="text-sm font-medium text-slate-500">{title}</p>
           <p className="text-3xl font-bold text-slate-900">{value}</p>
           {subtitle && <p className="text-sm text-slate-500">{subtitle}</p>}
           {trend && (
-            <p className={`text-sm font-medium ${trend.value >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+            <p
+              className={`text-sm font-medium ${trend.value >= 0 ? "text-emerald-600" : "text-red-600"}`}
+            >
               {trend.value >= 0 ? "↑" : "↓"} {Math.abs(trend.value)}% {trend.label}
             </p>
           )}
@@ -43,7 +69,9 @@ interface MetricCardSkeletonProps {
 
 export function MetricCardSkeleton({ className = "" }: MetricCardSkeletonProps) {
   return (
-    <div className={`bg-white rounded-xl border border-slate-200 p-6 shadow-sm animate-pulse ${className}`}>
+    <div
+      className={`bg-white rounded-xl border border-slate-200 p-6 shadow-sm animate-pulse ${className}`}
+    >
       <div className="flex items-start justify-between">
         <div className="space-y-3">
           <div className="h-4 w-24 bg-slate-200 rounded" />

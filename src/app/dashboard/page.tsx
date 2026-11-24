@@ -1,16 +1,5 @@
 import Link from "next/link";
-import {
-  Users,
-  Package,
-  Box,
-  Calendar,
-  ArrowRight,
-  Clock,
-  TrendingUp,
-  CheckCircle2,
-  AlertCircle,
-  Truck,
-} from "lucide-react";
+import { Package, ArrowRight, TrendingUp, CheckCircle2, Truck } from "lucide-react";
 import { requireMember } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/page-header";
@@ -172,26 +161,26 @@ export default async function Dashboard() {
         <MetricCard
           title="Total Customers"
           value={customerCount}
-          icon={Users}
+          iconName="users"
           trend={customerCount > 0 ? { value: 12, label: "vs last month" } : undefined}
         />
         <MetricCard
           title="Total Collections"
           value={collectionCount}
-          icon={Package}
+          iconName="package"
           trend={monthTrend !== 0 ? { value: monthTrend, label: "vs last month" } : undefined}
         />
-        <MetricCard title="Assets Registered" value={assetCount} icon={Box} />
+        <MetricCard title="Assets Registered" value={assetCount} iconName="box" />
         <MetricCard
           title="Awaiting Action"
           value={pendingCollections}
-          icon={Clock}
+          iconName="clock"
           subtitle={pendingCollections > 0 ? "Requires attention" : "All clear"}
         />
         <MetricCard
           title="In Transit"
           value={inTransitCount}
-          icon={Truck}
+          iconName="truck"
           subtitle={inTransitCount > 0 ? "On the road" : "None active"}
         />
       </div>
@@ -286,7 +275,7 @@ export default async function Dashboard() {
           <CardContent className="pt-0">
             {upcomingCollections.length === 0 ? (
               <EmptyState
-                icon={Calendar}
+                iconName="calendar"
                 title="No upcoming collections"
                 description="Schedule collections to see them here."
                 action={{ label: "Book Collection", href: "/dashboard/collections/new" }}
@@ -340,7 +329,7 @@ export default async function Dashboard() {
           <CardContent className="pt-0">
             {recentCollections.length === 0 ? (
               <EmptyState
-                icon={TrendingUp}
+                iconName="trending-up"
                 title="No recent activity"
                 description="Collection activity will appear here."
               />

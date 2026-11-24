@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell,
-  Check,
   CheckCheck,
   Package,
   Users,
@@ -14,6 +13,8 @@ import {
   UserPlus,
   Settings,
   Loader2,
+  RefreshCw,
+  WifiOff,
 } from "lucide-react";
 
 interface Notification {
@@ -27,6 +28,13 @@ interface Notification {
   entityId: string | null;
   actionUrl: string | null;
   createdAt: string;
+}
+
+interface NotificationResponse {
+  notifications: Notification[];
+  unreadCount: number | null;
+  serviceAvailable: boolean;
+  message?: string;
 }
 
 const typeIcons: Record<string, typeof Bell> = {
@@ -60,9 +68,11 @@ function formatTimeAgo(dateString: string): string {
 export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadCount, setUnreadCount] = useState<number | null>(0);
+  const [serviceAvailable, setServiceAvailable] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isMarkingRead, setIsMarkingRead] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -70,23 +80,36 @@ export function NotificationBell() {
     try {
       const res = await fetch("/api/notifications?limit=10");
       if (res.ok) {
-        const data = await res.json();
+        const data: NotificationResponse = await res.json();
         setNotifications(data.notifications || []);
-        setUnreadCount(data.unreadCount || 0);
+        setUnreadCount(data.unreadCount);
+        setServiceAvailable(data.serviceAvailable !== false);
+        setRetryCount(0); // Reset retry count on success
+      } else {
+        // Non-OK response
+        setServiceAvailable(false);
       }
     } catch (error) {
       console.error("Failed to fetch notifications:", error);
+      setServiceAvailable(false);
     }
   }, []);
 
-  // Initial fetch and polling
+  // Initial fetch and polling (with backoff when service unavailable)
   useEffect(() => {
     fetchNotifications();
 
-    // Poll every 30 seconds for new notifications
-    const interval = setInterval(fetchNotifications, 30000);
+    // Poll every 30 seconds if service available, otherwise back off
+    const pollInterval = serviceAvailable ? 30000 : Math.min(60000 * (retryCount + 1), 300000);
+    const interval = setInterval(() => {
+      if (!serviceAvailable) {
+        setRetryCount((prev) => prev + 1);
+      }
+      fetchNotifications();
+    }, pollInterval);
+
     return () => clearInterval(interval);
-  }, [fetchNotifications]);
+  }, [fetchNotifications, serviceAvailable, retryCount]);
 
   // Fetch on open
   useEffect(() => {
@@ -121,6 +144,8 @@ export function NotificationBell() {
   }, [isOpen]);
 
   const markAsRead = async (notificationId: string) => {
+    if (!serviceAvailable) return;
+
     try {
       await fetch("/api/notifications", {
         method: "PATCH",
@@ -133,13 +158,15 @@ export function NotificationBell() {
           n.id === notificationId ? { ...n, isRead: true, readAt: new Date().toISOString() } : n
         )
       );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
+      setUnreadCount((prev) => (prev !== null ? Math.max(0, prev - 1) : null));
     } catch (error) {
       console.error("Failed to mark as read:", error);
     }
   };
 
   const markAllAsRead = async () => {
+    if (!serviceAvailable) return;
+
     setIsMarkingRead(true);
     try {
       await fetch("/api/notifications", {
@@ -169,17 +196,34 @@ export function NotificationBell() {
     }
   };
 
+  const handleRetry = () => {
+    setIsLoading(true);
+    setRetryCount(0);
+    fetchNotifications().finally(() => setIsLoading(false));
+  };
+
   return (
     <div ref={containerRef} className="relative">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="relative p-2 rounded-lg hover:bg-slate-100 transition-colors"
-        aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
+        aria-label={
+          !serviceAvailable
+            ? "Notifications unavailable"
+            : unreadCount !== null && unreadCount > 0
+              ? `Notifications (${unreadCount} unread)`
+              : "Notifications"
+        }
       >
-        <Bell className="w-5 h-5 text-slate-600" />
-        {unreadCount > 0 && (
+        <Bell className={`w-5 h-5 ${serviceAvailable ? "text-slate-600" : "text-slate-400"}`} />
+        {serviceAvailable && unreadCount !== null && unreadCount > 0 && (
           <span className="absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-medium text-white">
             {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        )}
+        {!serviceAvailable && (
+          <span className="absolute top-1 right-1 flex h-3 w-3 items-center justify-center rounded-full bg-amber-500">
+            <WifiOff className="w-2 h-2 text-white" />
           </span>
         )}
       </button>
@@ -190,7 +234,7 @@ export function NotificationBell() {
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
             <h3 className="text-sm font-semibold text-slate-900">Notifications</h3>
-            {unreadCount > 0 && (
+            {serviceAvailable && unreadCount !== null && unreadCount > 0 && (
               <button
                 onClick={markAllAsRead}
                 disabled={isMarkingRead}
@@ -208,7 +252,30 @@ export function NotificationBell() {
 
           {/* Content */}
           <div className="max-h-96 overflow-y-auto">
-            {isLoading ? (
+            {!serviceAvailable ? (
+              // Service unavailable state
+              <div className="py-8 text-center px-4">
+                <WifiOff className="w-8 h-8 mx-auto text-amber-400 mb-2" />
+                <p className="text-sm font-medium text-slate-700">
+                  Notifications temporarily unavailable
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  The notification service is being set up
+                </p>
+                <button
+                  onClick={handleRetry}
+                  disabled={isLoading}
+                  className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-md transition-colors disabled:opacity-50"
+                >
+                  {isLoading ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3 h-3" />
+                  )}
+                  Retry
+                </button>
+              </div>
+            ) : isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
               </div>
@@ -269,7 +336,7 @@ export function NotificationBell() {
           </div>
 
           {/* Footer */}
-          {notifications.length > 0 && (
+          {serviceAvailable && notifications.length > 0 && (
             <div className="border-t border-slate-200 px-4 py-2">
               <button
                 onClick={() => {

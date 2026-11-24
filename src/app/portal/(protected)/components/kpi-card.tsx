@@ -1,12 +1,22 @@
 "use client";
 
-import { type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { getIcon, type IconName } from "@/lib/icons";
 
 interface KPICardProps {
   title: string;
   value: number;
   subtitle?: string;
-  icon: LucideIcon;
+  /**
+   * Icon name for Server Component → Client Component usage.
+   * Preferred method - pass a string that gets resolved client-side.
+   */
+  iconName?: IconName;
+  /**
+   * Direct icon component for Client Component → Client Component usage.
+   * @deprecated Use iconName when passing from Server Components.
+   */
+  icon?: LucideIcon;
   iconColor?: string;
   iconBgColor?: string;
   href?: string;
@@ -16,11 +26,14 @@ export function KPICard({
   title,
   value,
   subtitle,
-  icon: Icon,
+  iconName,
+  icon: DirectIcon,
   iconColor = "text-primary-teal",
   iconBgColor = "bg-primary-teal/10",
   href,
 }: KPICardProps) {
+  // Prefer iconName (safe for server/client boundary), fallback to direct icon
+  const Icon = iconName ? getIcon(iconName) : DirectIcon;
   const Wrapper = href ? "a" : "div";
   const wrapperProps = href ? { href } : {};
 
@@ -46,9 +59,11 @@ export function KPICard({
           </p>
           {subtitle && <p className="text-xs text-muted-text mt-1 truncate">{subtitle}</p>}
         </div>
-        <div className={`flex-shrink-0 p-3 rounded-xl ${iconBgColor}`}>
-          <Icon className={`w-5 h-5 ${iconColor}`} />
-        </div>
+        {Icon && (
+          <div className={`flex-shrink-0 p-3 rounded-xl ${iconBgColor}`}>
+            <Icon className={`w-5 h-5 ${iconColor}`} />
+          </div>
+        )}
       </div>
     </Wrapper>
   );

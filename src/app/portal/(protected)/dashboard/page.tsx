@@ -1,12 +1,3 @@
-import {
-  Package,
-  MapPin,
-  Shield,
-  Award,
-  Truck,
-  Calendar,
-  CheckCircle,
-} from "lucide-react";
 import { requireCustomerAccess } from "@/lib/portal-access";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
@@ -181,7 +172,7 @@ export default async function PortalDashboard() {
         <KPICard
           title="Total Assets"
           value={totalAssets}
-          icon={Package}
+          iconName="package"
           iconColor="text-primary-teal"
           iconBgColor="bg-primary-teal/10"
           href="/portal/assets"
@@ -190,21 +181,21 @@ export default async function PortalDashboard() {
           title="At Facility"
           value={assetsAtFacility}
           subtitle="In processing"
-          icon={MapPin}
+          iconName="map-pin"
           iconColor="text-blue-600"
           iconBgColor="bg-blue-100"
         />
         <KPICard
           title="Media Sanitised"
           value={mediaSanitised}
-          icon={Shield}
+          iconName="shield"
           iconColor="text-eco-green"
           iconBgColor="bg-emerald-100"
         />
         <KPICard
           title="Certificates"
           value={certMap["ISSUED"] || 0}
-          icon={Award}
+          iconName="award"
           iconColor="text-amber-600"
           iconBgColor="bg-amber-100"
           href="/portal/certificates"
@@ -216,7 +207,7 @@ export default async function PortalDashboard() {
         <KPICard
           title="Upcoming Collections"
           value={upcomingCollections}
-          icon={Calendar}
+          iconName="calendar"
           iconColor="text-indigo-600"
           iconBgColor="bg-indigo-100"
           href="/portal/collections"
@@ -224,7 +215,7 @@ export default async function PortalDashboard() {
         <KPICard
           title="Active Collections"
           value={activeCollections}
-          icon={Truck}
+          iconName="truck"
           iconColor="text-purple-600"
           iconBgColor="bg-purple-100"
           href="/portal/collections"
@@ -232,14 +223,14 @@ export default async function PortalDashboard() {
         <KPICard
           title="Assets Processed"
           value={assetsProcessed}
-          icon={CheckCircle}
+          iconName="check-circle"
           iconColor="text-eco-green"
           iconBgColor="bg-emerald-100"
         />
         <KPICard
           title="Total Media"
           value={Object.values(mediaMap).reduce((a, b) => a + b, 0)}
-          icon={Shield}
+          iconName="shield"
           iconColor="text-blue-600"
           iconBgColor="bg-blue-100"
         />
