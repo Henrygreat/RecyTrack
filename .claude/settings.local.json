@@ -62,7 +62,8 @@
       "Bash(timeout 60 tail:*)",
       "Bash(timeout 15 npm run dev)",
       "mcp__ide__getDiagnostics",
-      "Bash(DATABASE_URL=\"postgresql://test:test@localhost:5432/test\" npm run build:*)"
+      "Bash(DATABASE_URL=\"postgresql://test:test@localhost:5432/test\" npm run build:*)",
+      "Bash(Get-Content \"C:\\\\Users\\\\user\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-user-Downloads-ENCIF-RecyTrack-Phase1\\\\tasks\\\\b295f6b.output\" -Tail 100)"
     ]
   }
 }
