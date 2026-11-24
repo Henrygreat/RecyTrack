@@ -40,4 +40,13 @@ All exposed read/write queries are scoped by authenticated organisation membersh
 - `prisma/schema.prisma` data model
 - `prisma/seed.ts` demo owner and route dates
 
+## Customer dashboard metrics
+The dashboard counts records belonging to the signed-in customer's organisation and
+customer account. All Collections includes every status, matching the unfiltered
+collections page. Upcoming Collections counts approved, confirmed, scheduled and
+assigned collections with a scheduled date from today (UTC); Active Collections
+counts in-transit, collected and received collections. The media indicator reports the
+share of recorded media marked verified, destroyed or erasure passed; it is not a
+compliance or environmental-impact percentage.
+
 Owned by ENCIF. Review licence and dependencies before commercial redistribution.

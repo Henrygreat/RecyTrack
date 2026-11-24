@@ -1,6 +1,5 @@
 import Link from "next/link";
 import {
-  Truck,
   MapPin,
   Calendar,
   Package,
@@ -162,7 +161,7 @@ export default async function PortalCollections({ searchParams }: PageProps) {
         <CardContent>
           {collections.length === 0 ? (
             <EmptyState
-              icon={Truck}
+              iconName="truck"
               title="No collections found"
               description={
                 status !== "all"

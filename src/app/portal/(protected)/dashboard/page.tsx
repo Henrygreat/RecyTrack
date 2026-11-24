@@ -6,13 +6,14 @@ import { auth } from "@/auth";
 import { WelcomeBanner } from "../components/welcome-banner";
 import { KPICard } from "../components/kpi-card";
 import { QuickActions } from "../components/quick-actions";
-import { ProcessingStatus } from "../components/processing-status";
 import { RecentCertificates, RecentCollections } from "../components/recent-activity";
-import { SustainabilityMetrics } from "../components/sustainability-metrics";
+import { AssetLifecycle, MediaProgress } from "../components/dashboard-insights";
 
 export default async function PortalDashboard() {
   const ctx = await requireCustomerAccess();
   const session = await auth();
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
 
   // Get user name for welcome banner
   const user = session?.user?.id
@@ -32,6 +33,7 @@ export default async function PortalDashboard() {
     recentCertificates,
     upcomingCollections,
     activeCollections,
+    totalCollections,
   ] = await Promise.all([
     // Total assets
     prisma.asset.count({
@@ -79,6 +81,11 @@ export default async function PortalDashboard() {
         status: true,
         scheduledDate: true,
         _count: { select: { assets: true } },
+        statusHistory: {
+          select: { id: true, toStatus: true, createdAt: true },
+          orderBy: { createdAt: "desc" },
+          take: 3,
+        },
       },
     }),
 
@@ -105,11 +112,10 @@ export default async function PortalDashboard() {
       where: {
         customerId: ctx.customerId,
         organizationId: ctx.organizationId,
-        status: { in: ["SCHEDULED", "APPROVED", "CONFIRMED"] },
-        scheduledDate: { gte: new Date() },
+        status: { in: ["SCHEDULED", "APPROVED", "CONFIRMED", "ASSIGNED"] },
+        scheduledDate: { gte: today },
       },
     }),
-
     // Active collections count
     prisma.collection.count({
       where: {
@@ -117,6 +123,9 @@ export default async function PortalDashboard() {
         organizationId: ctx.organizationId,
         status: { in: ["IN_TRANSIT", "COLLECTED", "RECEIVED"] },
       },
+    }),
+    prisma.collection.count({
+      where: { customerId: ctx.customerId, organizationId: ctx.organizationId },
     }),
   ]);
 
@@ -155,20 +164,17 @@ export default async function PortalDashboard() {
     (mediaMap["DESTROYED"] || 0) +
     (mediaMap["ERASURE_PASSED"] || 0);
 
-  const recycledAssets = (statusMap["RECYCLED"] || 0) + (statusMap["DESTROYED"] || 0);
-  const reusedAssets = (statusMap["SOLD"] || 0) + (statusMap["RELEASED"] || 0);
-  const failedMedia = mediaMap["ERASURE_FAILED"] || 0;
+  const totalMedia = Object.values(mediaMap).reduce((a, b) => a + b, 0);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Welcome Banner */}
       <WelcomeBanner
         customerName={ctx.customerAccess.customer.name}
         userName={user?.name || undefined}
       />
 
-      {/* KPI Cards - Bento Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KPICard
           title="Total Assets"
           value={totalAssets}
@@ -202,34 +208,37 @@ export default async function PortalDashboard() {
         />
       </div>
 
-      {/* Collection Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KPICard
-          title="Upcoming Collections"
-          value={upcomingCollections}
+          title="All Collections"
+          value={totalCollections}
+          subtitle="All statuses"
           iconName="calendar"
           iconColor="text-indigo-600"
           iconBgColor="bg-indigo-100"
           href="/portal/collections"
         />
         <KPICard
-          title="Active Collections"
-          value={activeCollections}
+          title="Upcoming Collections"
+          value={upcomingCollections}
+          subtitle="Scheduled from today"
           iconName="truck"
           iconColor="text-purple-600"
           iconBgColor="bg-purple-100"
           href="/portal/collections"
         />
         <KPICard
-          title="Assets Processed"
-          value={assetsProcessed}
+          title="Active Collections"
+          value={activeCollections}
+          subtitle="In transit, collected or received"
           iconName="check-circle"
           iconColor="text-eco-green"
           iconBgColor="bg-emerald-100"
         />
         <KPICard
-          title="Total Media"
-          value={Object.values(mediaMap).reduce((a, b) => a + b, 0)}
+          title="Assets Processed"
+          value={assetsProcessed}
+          subtitle="Ready, released, sold, recycled or destroyed"
           iconName="shield"
           iconColor="text-blue-600"
           iconBgColor="bg-blue-100"
@@ -239,30 +248,18 @@ export default async function PortalDashboard() {
       {/* Quick Actions */}
       <QuickActions />
 
-      {/* Main Content Grid */}
-      <div className="grid lg:grid-cols-3 gap-6">
-        {/* Left Column - Processing Status & Sustainability */}
-        <div className="space-y-6">
-          <ProcessingStatus
-            inspection={statusMap["INSPECTION"] || 0}
-            processing={
-              (statusMap["PROCESSING"] || 0) + (statusMap["DATA_ERASURE"] || 0)
-            }
-            ready={(statusMap["READY"] || 0) + (statusMap["RELEASED"] || 0)}
-            attention={failedMedia}
-          />
-          <SustainabilityMetrics
-            totalAssets={assetsProcessed}
-            recycled={recycledAssets}
-            reused={reusedAssets}
-            sanitised={mediaSanitised}
-          />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-12">
+        <div className="lg:col-span-7">
+          <AssetLifecycle statuses={assetsByStatus.map((item) => ({ status: item.status, count: item._count }))} />
         </div>
-
-        {/* Middle & Right Columns - Recent Activity */}
-        <div className="lg:col-span-2 space-y-6">
-          <RecentCertificates certificates={recentCertificates} />
+        <div className="lg:col-span-5">
+          <MediaProgress completed={mediaSanitised} total={totalMedia} />
+        </div>
+        <div className="lg:col-span-7">
           <RecentCollections collections={recentCollections} />
+        </div>
+        <div className="lg:col-span-5">
+          <RecentCertificates certificates={recentCertificates} />
         </div>
       </div>
     </div>

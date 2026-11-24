@@ -190,7 +190,7 @@ export function PortalSidebar({
           return (
             <div key={group.title}>
               {!isCollapsed && (
-                <h3 className="px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <h3 className="px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   {group.title}
                 </h3>
               )}
@@ -211,16 +211,17 @@ export function PortalSidebar({
                         transition-all duration-150 group
                         ${
                           isActive
-                            ? "bg-primary-teal text-white shadow-lg shadow-primary-teal/20"
-                            : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+                            ? "bg-teal-700 text-white shadow-lg"
+                            : "text-slate-300 hover:text-white hover:bg-slate-800/50"
                         }
                         ${isCollapsed ? "justify-center" : ""}
                       `}
                     >
                       <Icon
                         className={`w-5 h-5 flex-shrink-0 ${
-                          isActive ? "text-white" : "text-slate-400 group-hover:text-white"
+                          isActive ? "text-white" : "text-slate-300 group-hover:text-white"
                         }`}
+                        aria-current={isActive ? "page" : undefined}
                       />
                       {!isCollapsed && (
                         <>

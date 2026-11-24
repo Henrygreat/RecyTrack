@@ -78,6 +78,7 @@ export function RecentCertificates({ certificates }: RecentCertificatesProps) {
                     ? new Date(cert.issueDate).toLocaleDateString("en-GB", {
                         day: "numeric",
                         month: "short",
+                        timeZone: "UTC",
                       })
                     : "-"}
                 </p>
@@ -96,6 +97,7 @@ interface RecentCollection {
   status: CollectionStatus;
   scheduledDate: Date | null;
   _count: { assets: number };
+  statusHistory: { id: string; toStatus: CollectionStatus; createdAt: Date }[];
 }
 
 interface RecentCollectionsProps {
@@ -143,9 +145,11 @@ export function RecentCollections({ collections }: RecentCollectionsProps) {
               <Link
                 key={collection.id}
                 href={`/portal/collections/${collection.id}`}
-                className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
+                className="block p-4 hover:bg-slate-50 transition-colors"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span aria-hidden="true" className="h-2.5 w-2.5 rounded-full bg-teal-700" />
                   <span className="font-mono text-sm font-medium text-midnight-navy">
                     {collection.reference}
                   </span>
@@ -165,10 +169,23 @@ export function RecentCollections({ collections }: RecentCollectionsProps) {
                       {new Date(collection.scheduledDate).toLocaleDateString("en-GB", {
                         day: "numeric",
                         month: "short",
+                        timeZone: "UTC",
                       })}
                     </span>
                   )}
                 </div>
+                </div>
+                {collection.statusHistory.length > 0 && (
+                  <ol aria-label={`Recent journey for ${collection.reference}`} className="mt-3 flex flex-wrap gap-x-4 gap-y-2 border-l-2 border-teal-100 pl-3">
+                    {[...collection.statusHistory].reverse().map((event) => (
+                      <li key={event.id} className="text-xs text-slate-600">
+                        <span className="font-medium text-slate-700">{event.toStatus.replace(/_/g, " ")}</span>
+                        {" · "}
+                        {new Date(event.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}
+                      </li>
+                    ))}
+                  </ol>
+                )}
               </Link>
             );
           })

@@ -110,7 +110,7 @@ export function PortalMobileNav({
       />
 
       {/* Drawer */}
-      <div className="fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] bg-midnight-navy lg:hidden animate-slide-in-left">
+      <div className="fixed inset-y-0 left-0 z-50 flex flex-col w-80 max-w-[85vw] bg-midnight-navy lg:hidden">
         {/* Header */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-slate-700/50">
           <Link href="/portal/dashboard" onClick={onClose} className="flex items-center gap-3">
@@ -149,7 +149,7 @@ export function PortalMobileNav({
 
             return (
               <div key={group.title} className="mb-6">
-                <h3 className="px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <h3 className="px-3 mb-2 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   {group.title}
                 </h3>
                 <div className="space-y-1">
@@ -169,10 +169,11 @@ export function PortalMobileNav({
                           transition-colors touch-manipulation
                           ${
                             isActive
-                              ? "bg-primary-teal text-white"
-                              : "text-slate-400 hover:text-white hover:bg-slate-800/50 active:bg-slate-800"
+                              ? "bg-teal-700 text-white"
+                              : "text-slate-300 hover:text-white hover:bg-slate-800/50 active:bg-slate-800"
                           }
                         `}
+                        aria-current={isActive ? "page" : undefined}
                       >
                         <Icon className="w-5 h-5" />
                         <span className="text-sm font-medium">{item.label}</span>

@@ -7,6 +7,15 @@
 
 /* CSS Variables for Design Tokens */
 @theme {
+  --color-midnight-navy: #0f172a;
+  --color-primary-teal: #0d9488;
+  --color-accent-teal: #14b8a6;
+  --color-eco-green: #10b981;
+  --color-light-bg: #f1f5f9;
+  --color-muted-text: #64748b;
+  --text-2xs: 0.625rem;
+  --shadow-bento: 0 1px 3px 0 rgb(15 23 42 / 0.06);
+  --shadow-bento-hover: 0 10px 15px -3px rgb(15 23 42 / 0.08);
   --color-brand-50: #f0fdfa;
   --color-brand-100: #ccfbf1;
   --color-brand-200: #99f6e4;
@@ -36,6 +45,40 @@
   @keyframes scaleIn {
     0% { transform: scale(0.95); opacity: 0; }
     100% { transform: scale(1); opacity: 1; }
+  }
+}
+
+/* Customer portal tokens are isolated from the internal dashboard. */
+.customer-portal {
+  --portal-sidebar: #0f172a;
+  --portal-surface-dark: #1e293b;
+  --portal-primary: #0d9488;
+  --portal-emerald: #10b981;
+  --portal-blue: #3b82f6;
+  --portal-amber: #f59e0b;
+  --portal-background: #f1f5f9;
+  --portal-card: #ffffff;
+  --portal-text: #0f172a;
+  --portal-muted: #64748b;
+  --portal-border: #e2e8f0;
+  background-color: var(--portal-background);
+  color: var(--portal-text);
+}
+
+.customer-portal .portal-welcome {
+  background: linear-gradient(120deg, #0f172a, #115e59 70%, #0f766e);
+}
+
+.customer-portal .text-primary-teal {
+  color: #0f766e;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .customer-portal *, .customer-portal *::before, .customer-portal *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

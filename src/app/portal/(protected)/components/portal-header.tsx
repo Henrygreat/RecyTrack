@@ -4,17 +4,13 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Search,
-  Bell,
   User,
   LogOut,
-  Settings,
   ChevronDown,
   Menu,
   X,
   Building2,
   ChevronRight,
-  HelpCircle,
 } from "lucide-react";
 
 interface PortalHeaderProps {
@@ -26,7 +22,6 @@ interface PortalHeaderProps {
   onSignOut: () => Promise<void>;
   onMobileMenuToggle: () => void;
   isMobileMenuOpen: boolean;
-  notificationCount?: number;
 }
 
 // Breadcrumb mapping
@@ -53,11 +48,8 @@ export function PortalHeader({
   onSignOut,
   onMobileMenuToggle,
   isMobileMenuOpen,
-  notificationCount = 0,
 }: PortalHeaderProps) {
   const pathname = usePathname();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -79,14 +71,6 @@ export function PortalHeader({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      // Search will be handled by API - scoped to customer
-      window.location.href = `/portal/search?q=${encodeURIComponent(searchQuery.trim())}`;
-    }
-  };
 
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-slate-200">
@@ -130,49 +114,6 @@ export function PortalHeader({
 
         {/* Right: Search, Notifications, Profile */}
         <div className="flex items-center gap-2 lg:gap-4">
-          {/* Search - Desktop */}
-          <form
-            onSubmit={handleSearch}
-            className={`hidden md:flex items-center transition-all duration-200 ${
-              isSearchFocused ? "w-80" : "w-64"
-            }`}
-          >
-            <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onFocus={() => setIsSearchFocused(true)}
-                onBlur={() => setIsSearchFocused(false)}
-                placeholder="Search assets, collections..."
-                className="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-teal/20 focus:border-primary-teal transition-all"
-              />
-            </div>
-          </form>
-
-          {/* Search - Mobile */}
-          <button
-            className="md:hidden p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-            aria-label="Search"
-          >
-            <Search className="w-5 h-5" />
-          </button>
-
-          {/* Notifications */}
-          <Link
-            href="/portal/notifications"
-            className="relative p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-            aria-label={`Notifications ${notificationCount > 0 ? `(${notificationCount} unread)` : ""}`}
-          >
-            <Bell className="w-5 h-5" />
-            {notificationCount > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 flex items-center justify-center text-2xs font-bold rounded-full bg-red-500 text-white">
-                {notificationCount > 9 ? "9+" : notificationCount}
-              </span>
-            )}
-          </Link>
-
           {/* Profile Dropdown */}
           <div ref={profileRef} className="relative">
             <button
@@ -224,26 +165,6 @@ export function PortalHeader({
                     <span className="truncate">{customerName}</span>
                   </div>
                   <div className="mt-1 text-xs text-slate-400 font-mono">{customerReference}</div>
-                </div>
-
-                {/* Menu Items */}
-                <div className="py-1">
-                  <Link
-                    href="/portal/settings"
-                    onClick={() => setIsProfileOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                  >
-                    <Settings className="w-4 h-4 text-slate-400" />
-                    Settings
-                  </Link>
-                  <Link
-                    href="/portal/help"
-                    onClick={() => setIsProfileOpen(false)}
-                    className="flex items-center gap-3 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
-                  >
-                    <HelpCircle className="w-4 h-4 text-slate-400" />
-                    Help & Support
-                  </Link>
                 </div>
 
                 {/* Sign Out */}

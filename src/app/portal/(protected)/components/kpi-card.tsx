@@ -2,6 +2,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import { getIcon, type IconName } from "@/lib/icons";
+import { DashboardCounter } from "./dashboard-insights";
 
 interface KPICardProps {
   title: string;
@@ -55,7 +56,7 @@ export function KPICard({
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-muted-text truncate">{title}</p>
           <p className="text-2xl lg:text-3xl font-bold text-midnight-navy mt-1 animate-count-up">
-            {value.toLocaleString()}
+            <DashboardCounter value={value} />
           </p>
           {subtitle && <p className="text-xs text-muted-text mt-1 truncate">{subtitle}</p>}
         </div>

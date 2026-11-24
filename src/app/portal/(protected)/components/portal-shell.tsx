@@ -13,7 +13,6 @@ interface PortalShellProps {
   userName?: string;
   userEmail?: string;
   onSignOut: () => Promise<void>;
-  notificationCount?: number;
 }
 
 const SIDEBAR_COLLAPSED_KEY = "portal-sidebar-collapsed";
@@ -26,7 +25,6 @@ export function PortalShell({
   userName,
   userEmail,
   onSignOut,
-  notificationCount = 0,
 }: PortalShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -75,7 +73,7 @@ export function PortalShell({
   }
 
   return (
-    <div className="min-h-screen bg-light-bg">
+    <div className="customer-portal min-h-screen">
       {/* Desktop Sidebar */}
       <div className="hidden lg:block">
         <PortalSidebar
@@ -113,7 +111,6 @@ export function PortalShell({
           onSignOut={onSignOut}
           onMobileMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
           isMobileMenuOpen={mobileMenuOpen}
-          notificationCount={notificationCount}
         />
 
         {/* Page Content */}

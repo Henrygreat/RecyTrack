@@ -9,18 +9,10 @@ interface WelcomeBannerProps {
 }
 
 export function WelcomeBanner({ customerName, userName }: WelcomeBannerProps) {
-  // Get time-based greeting
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
-    return "Good evening";
-  };
-
   const displayName = userName?.split(" ")[0] || "there";
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary-teal via-primary-teal to-accent-teal p-6 lg:p-8 shadow-lg">
+    <div className="portal-welcome relative overflow-hidden rounded-2xl p-6 lg:p-8 shadow-lg">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Floating circles */}
@@ -50,7 +42,7 @@ export function WelcomeBanner({ customerName, userName }: WelcomeBannerProps) {
         {/* Text Content */}
         <div className="max-w-xl">
           <h1 className="text-2xl lg:text-3xl font-bold text-white mb-2">
-            {getGreeting()}, {displayName}
+            Welcome, {displayName}
           </h1>
           <p className="text-teal-100 text-base lg:text-lg mb-1">{customerName}</p>
           <p className="text-white/80 text-sm lg:text-base">
@@ -63,7 +55,7 @@ export function WelcomeBanner({ customerName, userName }: WelcomeBannerProps) {
         <div className="flex flex-col sm:flex-row gap-3 lg:flex-col xl:flex-row">
           <Link
             href="/portal/book"
-            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white text-primary-teal font-semibold rounded-lg shadow-md hover:shadow-lg hover:bg-teal-50 transition-all group"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white text-teal-800 font-semibold rounded-lg shadow-md hover:shadow-lg hover:bg-teal-50 transition-all group"
           >
             <Truck className="w-5 h-5" />
             <span>Book a Collection</span>
@@ -80,7 +72,7 @@ export function WelcomeBanner({ customerName, userName }: WelcomeBannerProps) {
       </div>
 
       {/* Decorative Recycling Illustration */}
-      <div className="hidden lg:block absolute right-8 bottom-0 w-48 h-48">
+      <div aria-hidden="true" className="pointer-events-none hidden lg:block absolute right-8 bottom-0 w-48 h-48">
         <RecyclingIllustration />
       </div>
     </div>

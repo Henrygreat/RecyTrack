@@ -56,7 +56,7 @@ export default async function PortalSites() {
         <CardContent>
           {sites.length === 0 ? (
             <EmptyState
-              icon={MapPin}
+              iconName="map-pin"
               title="No sites available"
               description="Contact your account manager to add collection sites."
             />

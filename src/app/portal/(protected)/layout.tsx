@@ -19,9 +19,6 @@ export default async function PortalLayout({
       })
     : null;
 
-  // Get unread notification count (placeholder - implement when notifications table exists)
-  const notificationCount = 0;
-
   async function handleSignOut() {
     "use server";
     await signOut({ redirectTo: "/login" });
@@ -35,7 +32,6 @@ export default async function PortalLayout({
       userName={user?.name || undefined}
       userEmail={user?.email || undefined}
       onSignOut={handleSignOut}
-      notificationCount={notificationCount}
     >
       {children}
     </PortalShell>
