@@ -340,7 +340,7 @@ export async function calculateCollectionPricing(
     return {
       isFree: true,
       freeReason: eligibility.matchedRules[0]?.ruleName || "Free collection policy",
-      chargeableStatus: "FREE" as ChargeableStatus,
+      chargeableStatus: "CHARGEABLE_FREE",
       quoteRequired: false,
       charges: [],
       subtotal: 0,
@@ -368,7 +368,7 @@ export async function calculateCollectionPricing(
     if (collectionCharge.quoteRequired) {
       return {
         isFree: false,
-        chargeableStatus: "QUOTED" as ChargeableStatus,
+        chargeableStatus: "CHARGEABLE_QUOTED",
         quoteRequired: true,
         charges: [],
         subtotal: 0,
@@ -419,7 +419,7 @@ export async function calculateCollectionPricing(
       if (transportPolicy.dedicatedCollectionCharge === "QUOTED") {
         return {
           isFree: false,
-          chargeableStatus: "QUOTED" as ChargeableStatus,
+          chargeableStatus: "CHARGEABLE_QUOTED",
           quoteRequired: true,
           charges,
           subtotal: 0,
@@ -498,7 +498,7 @@ export async function calculateCollectionPricing(
     } else if (dataServicesPolicy.certifiedErasure === "QUOTED") {
       return {
         isFree: false,
-        chargeableStatus: "QUOTED" as ChargeableStatus,
+        chargeableStatus: "CHARGEABLE_QUOTED",
         quoteRequired: true,
         charges,
         subtotal: 0,
@@ -531,7 +531,7 @@ export async function calculateCollectionPricing(
     } else if (dataServicesPolicy.physicalDestruction === "QUOTED") {
       return {
         isFree: false,
-        chargeableStatus: "QUOTED" as ChargeableStatus,
+        chargeableStatus: "CHARGEABLE_QUOTED",
         quoteRequired: true,
         charges,
         subtotal: 0,
@@ -551,9 +551,9 @@ export async function calculateCollectionPricing(
 
   // Determine chargeable status
   const chargeableStatus: ChargeableStatus =
-    charges.length === 0 ? "FREE" :
-    eligibility.matchedRules.length > 0 ? "CONDITIONAL_FREE" :
-    "CHARGEABLE";
+    charges.length === 0 ? "CHARGEABLE_FREE" :
+    eligibility.matchedRules.length > 0 ? "CHARGEABLE_CONDITIONAL" :
+    "CHARGEABLE_YES";
 
   return {
     isFree: charges.length === 0,

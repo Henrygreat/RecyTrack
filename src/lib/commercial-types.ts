@@ -36,18 +36,18 @@ export type ChargeType =
   | 'CUSTOM';
 
 export type ChargeableStatus =
-  | 'PENDING'
-  | 'FREE'
-  | 'CONDITIONAL_FREE'
-  | 'CHARGEABLE'
-  | 'QUOTED'
-  | 'WAIVED';
+  | 'CHARGEABLE_PENDING'
+  | 'CHARGEABLE_FREE'
+  | 'CHARGEABLE_CONDITIONAL'
+  | 'CHARGEABLE_YES'
+  | 'CHARGEABLE_QUOTED'
+  | 'CHARGEABLE_WAIVED';
 
 export type CollectionCommercialType =
-  | 'STANDARD'
-  | 'CONTRACTED'
-  | 'QUOTED'
-  | 'AD_HOC';
+  | 'COMMERCIAL_STANDARD'
+  | 'COMMERCIAL_CONTRACTED'
+  | 'COMMERCIAL_QUOTED'
+  | 'COMMERCIAL_AD_HOC';
 
 // ============================================
 // ORGANIZATION COMMERCIAL SETTINGS
