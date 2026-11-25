@@ -134,7 +134,7 @@ export default async function Routes({ searchParams }: { searchParams: Promise<S
           <CardContent style={{ paddingTop: "1.5rem" }}>
             {routes.length === 0 ? (
               <EmptyState
-                icon={Calendar}
+                iconName="calendar"
                 title="No routes published"
                 description={isManager ? "Click 'Publish Route' to create your first collection date." : "No collection dates are currently available."}
               />
@@ -151,7 +151,7 @@ export default async function Routes({ searchParams }: { searchParams: Promise<S
           <CardContent>
             {routes.length === 0 ? (
               <EmptyState
-                icon={Calendar}
+                iconName="calendar"
                 title="No routes published"
                 description={isManager ? "Click 'Publish Route' to create your first collection date." : "No collection dates are currently available."}
               />

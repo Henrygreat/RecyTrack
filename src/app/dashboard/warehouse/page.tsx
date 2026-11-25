@@ -5,9 +5,6 @@ import {
   MapPin,
   Package,
   ChevronRight,
-  CheckCircle,
-  XCircle,
-  LayoutGrid,
 } from "lucide-react";
 import { requireMember, MANAGEMENT_ROLES } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
@@ -90,23 +87,23 @@ export default async function WarehousePage({
         <MetricCard
           title="Total Locations"
           value={metrics._count.id}
-          icon={Warehouse}
+          iconName="warehouse"
         />
         <MetricCard
           title="Active Locations"
           value={activeLocations}
-          icon={CheckCircle}
+          iconName="check-circle"
         />
         <MetricCard
           title="Assets Assigned"
           value={totalAssets}
-          icon={Package}
+          iconName="package"
           subtitle={`${unassignedAssets} unassigned`}
         />
         <MetricCard
           title="Capacity Used"
           value={`${utilizationPercent}%`}
-          icon={LayoutGrid}
+          iconName="layout-grid"
           subtitle={totalCapacity > 0 ? `${totalUsed} / ${totalCapacity}` : "No capacity set"}
         />
       </div>
@@ -156,7 +153,7 @@ export default async function WarehousePage({
         <CardContent className="pt-0">
           {locations.length === 0 ? (
             <EmptyState
-              icon={Warehouse}
+              iconName="warehouse"
               title="No warehouse locations"
               description={
                 params.status

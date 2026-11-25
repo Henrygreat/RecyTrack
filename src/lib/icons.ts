@@ -21,6 +21,7 @@ import {
   Clock,
   Users,
   Box,
+  Boxes,
   TrendingUp,
   AlertCircle,
   AlertTriangle,
@@ -48,14 +49,18 @@ import {
   Copy,
   Check,
   Info,
+  Archive,
+  Activity,
   // Dashboard/Business icons
   LayoutDashboard,
+  LayoutGrid,
   BarChart3,
   PieChart,
   LineChart,
   FileText,
   ClipboardList,
   ClipboardCheck,
+  Clipboard,
   Warehouse,
   Building2,
   // Asset/Processing icons
@@ -70,6 +75,12 @@ import {
   Lock,
   Unlock,
   Key,
+  HardDrive,
+  Monitor,
+  Laptop,
+  Server,
+  Smartphone,
+  MapPinned,
   // User/Admin icons
   User,
   UserCog,
@@ -138,6 +149,7 @@ export type IconName =
   | "clock"
   | "users"
   | "box"
+  | "boxes"
   | "trending-up"
   | "alert-circle"
   | "alert-triangle"
@@ -165,13 +177,17 @@ export type IconName =
   | "copy"
   | "check"
   | "info"
+  | "archive"
+  | "activity"
   | "layout-dashboard"
+  | "layout-grid"
   | "bar-chart-3"
   | "pie-chart"
   | "line-chart"
   | "file-text"
   | "clipboard-list"
   | "clipboard-check"
+  | "clipboard"
   | "warehouse"
   | "building-2"
   | "qr-code"
@@ -185,6 +201,12 @@ export type IconName =
   | "lock"
   | "unlock"
   | "key"
+  | "hard-drive"
+  | "monitor"
+  | "laptop"
+  | "server"
+  | "smartphone"
+  | "map-pinned"
   | "user"
   | "user-cog"
   | "user-plus"
@@ -243,6 +265,7 @@ const iconRegistry: Record<IconName, LucideIcon> = {
   clock: Clock,
   users: Users,
   box: Box,
+  boxes: Boxes,
   "trending-up": TrendingUp,
   "alert-circle": AlertCircle,
   "alert-triangle": AlertTriangle,
@@ -270,13 +293,17 @@ const iconRegistry: Record<IconName, LucideIcon> = {
   copy: Copy,
   check: Check,
   info: Info,
+  archive: Archive,
+  activity: Activity,
   "layout-dashboard": LayoutDashboard,
+  "layout-grid": LayoutGrid,
   "bar-chart-3": BarChart3,
   "pie-chart": PieChart,
   "line-chart": LineChart,
   "file-text": FileText,
   "clipboard-list": ClipboardList,
   "clipboard-check": ClipboardCheck,
+  clipboard: Clipboard,
   warehouse: Warehouse,
   "building-2": Building2,
   "qr-code": QrCode,
@@ -290,6 +317,12 @@ const iconRegistry: Record<IconName, LucideIcon> = {
   lock: Lock,
   unlock: Unlock,
   key: Key,
+  "hard-drive": HardDrive,
+  monitor: Monitor,
+  laptop: Laptop,
+  server: Server,
+  smartphone: Smartphone,
+  "map-pinned": MapPinned,
   user: User,
   "user-cog": UserCog,
   "user-plus": UserPlus,

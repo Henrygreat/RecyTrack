@@ -1,12 +1,9 @@
 import Link from "next/link";
 import {
-  Users,
   Plus,
   Mail,
   MapPin,
   Building,
-  Archive,
-  CheckCircle,
   Phone,
   ChevronRight,
 } from "lucide-react";
@@ -112,9 +109,9 @@ export default async function Customers({ searchParams }: PageProps) {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <MetricCard title="Active Customers" value={activeCount} icon={CheckCircle} />
-        <MetricCard title="Archived" value={archivedCount} icon={Archive} />
-        <MetricCard title="Total Records" value={activeCount + archivedCount} icon={Users} />
+        <MetricCard title="Active Customers" value={activeCount} iconName="check-circle" />
+        <MetricCard title="Archived" value={archivedCount} iconName="archive" />
+        <MetricCard title="Total Records" value={activeCount + archivedCount} iconName="users" />
       </div>
 
       {/* Filters */}
@@ -136,7 +133,7 @@ export default async function Customers({ searchParams }: PageProps) {
         <CardContent className="pt-0">
           {customers.length === 0 ? (
             <EmptyState
-              icon={Users}
+              iconName="users"
               title={search ? "No customers found" : "No customers yet"}
               description={
                 search

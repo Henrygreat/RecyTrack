@@ -146,10 +146,10 @@ export default async function AssetsPage({
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <MetricCard title="Total Assets" value={total} icon={Package} />
-        <MetricCard title="Inbound" value={inbound} icon={Package} subtitle="Expected & Collected" />
-        <MetricCard title="Processing" value={inProcessing} icon={HardDrive} subtitle="In workflow" />
-        <MetricCard title="Ready" value={ready} icon={Monitor} subtitle="Ready for disposition" />
+        <MetricCard title="Total Assets" value={total} iconName="package" />
+        <MetricCard title="Inbound" value={inbound} iconName="package" subtitle="Expected & Collected" />
+        <MetricCard title="Processing" value={inProcessing} iconName="hard-drive" subtitle="In workflow" />
+        <MetricCard title="Ready" value={ready} iconName="monitor" subtitle="Ready for disposition" />
       </div>
 
       {/* Filters */}
@@ -221,7 +221,7 @@ export default async function AssetsPage({
         <CardContent className="pt-0">
           {assets.length === 0 ? (
             <EmptyState
-              icon={Package}
+              iconName="package"
               title="No assets found"
               description={
                 params.search || params.status || params.category

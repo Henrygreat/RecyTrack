@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Package, Plus, Calendar, MapPin, Hash, Boxes, ChevronRight } from "lucide-react";
+import { Plus, Calendar, MapPin, Hash, Boxes, ChevronRight } from "lucide-react";
 import { requireMember, MANAGEMENT_ROLES } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { updateCollectionStatus } from "@/app/actions";
@@ -87,10 +87,10 @@ export default async function Collections() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <MetricCard title="Pending" value={pendingCount} icon={Package} subtitle="Awaiting action" />
-        <MetricCard title="In Progress" value={inProgressCount} icon={Boxes} subtitle="Being processed" />
-        <MetricCard title="Completed" value={completedCount} icon={Calendar} subtitle="This period" />
-        <MetricCard title="Total" value={collections.length} icon={Hash} />
+        <MetricCard title="Pending" value={pendingCount} iconName="package" subtitle="Awaiting action" />
+        <MetricCard title="In Progress" value={inProgressCount} iconName="boxes" subtitle="Being processed" />
+        <MetricCard title="Completed" value={completedCount} iconName="calendar" subtitle="This period" />
+        <MetricCard title="Total" value={collections.length} iconName="hash" />
       </div>
 
       <Card>
@@ -103,7 +103,7 @@ export default async function Collections() {
         <CardContent className="pt-0">
           {collections.length === 0 ? (
             <EmptyState
-              icon={Package}
+              iconName="package"
               title="No collections yet"
               description="Book your first collection to get started."
               action={
